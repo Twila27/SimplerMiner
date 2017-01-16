@@ -131,7 +131,7 @@ void Chunk::PopulateColumnWithNetherBlocksWithPerlinNoise( GlobalColumnCoords gl
 		LocalBlockCoords lbc = LocalBlockCoords( lcc.x, lcc.y, blockHeight );
 		LocalBlockIndex lbi = GetLocalBlockIndexFromLocalBlockCoords( lbc );
 
-		//TODO: run through a column assigning ceiling and ground alike, if to else. Bottom to top though, loop starts z=0.
+		//Run through a column assigning ceiling and ground alike. Bottom to top though, loop starts z=0.
 		if ( blockHeight < groundHeight - NUM_DIRT_LAYERS )
 		{
 			//Nether's stone.
