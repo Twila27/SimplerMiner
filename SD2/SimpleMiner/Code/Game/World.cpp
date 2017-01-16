@@ -1622,7 +1622,7 @@ void World::UpdateLighting()
 		int currentLight = currentBlock->GetLightLevel();
 		if ( idealLight == currentLight ) continue; //Already correct, implying neighbors don't need dirtying.
 
-		currentBlock->SetLightLevel( idealLight ); //Problem is this is not hit!
+		currentBlock->SetLightLevel( idealLight );
 		DirtyNonSkyNeighborsForBlock( bi );
 		bi.m_myChunk->MarkVertexArrayDirty();
 	}
