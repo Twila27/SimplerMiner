@@ -119,16 +119,18 @@ ChunkCoords GetChunkCoordsFromWorldCoordsXY( const WorldCoordsXY& wc )
 	int wcX = (int)floor( wc.x );
 	int wcY = (int)floor( wc.y );
 
-	bool isMultipleOfSixteenX = ( ( wcX & ( CHUNK_X_LENGTH_IN_BLOCKS - 1 ) ) == 0 ); //replaces ( wcX % CHUNK_X_LENGTH_IN_BLOCKS == 0 ); //!
-	bool isMultipleOfSixteenY = ( ( wcY & ( CHUNK_Y_WIDTH_IN_BLOCKS - 1 ) ) == 0 ); //replaces ( wcY % CHUNK_Y_WIDTH_IN_BLOCKS == 0 );
+	bool isMultipleOfSixteenX = ( ( wcX & ( CHUNK_X_LENGTH_IN_BLOCKS - 1 ) ) == 0 );
+	bool isMultipleOfSixteenY = ( ( wcY & ( CHUNK_Y_WIDTH_IN_BLOCKS - 1 ) ) == 0 );
 
-	//Not replacing the divisions because here at times (wcX/Y >> CHUNK_BITS_X/Y) != (wcX/Y / CHUNK_X/Y_IN_BLOCKS).
+	//Not replacing the divisions because sometimes (wcX/Y >> CHUNK_BITS_X/Y) != (wcX/Y / CHUNK_X/Y_IN_BLOCKS).
 	cc.x = wcX / CHUNK_X_LENGTH_IN_BLOCKS;
 	cc.y = wcY / CHUNK_Y_WIDTH_IN_BLOCKS;
 
 	//Compensate for mins-aligned chunk coordinate system, where (0,0) implicates immediate top and right chunk.
-	if ( wcX < 0 && !isMultipleOfSixteenX ) cc.x--;
-	if ( wcY < 0 && !isMultipleOfSixteenY ) cc.y--;
+	if ( wcX < 0 && !isMultipleOfSixteenX ) 
+		cc.x--;
+	if ( wcY < 0 && !isMultipleOfSixteenY ) 
+		cc.y--;
 
 	return cc;
 }

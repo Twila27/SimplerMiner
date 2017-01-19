@@ -783,49 +783,52 @@ float Compute4dPerlinNoise( float posX, float posY, float posZ, float posT, floa
 //		or more additional "octave" harmonics.  Each additional octave has
 //		double the frequency/density but only a fraction of the amplitude of
 //		the base noise.
-//	<baseAmplitude>: The minimum (-amplitude) and maximum (+amplitude) values
-//		produced by the first octave of the noise.  Note that adding
-//		additional octaves can push the final total Perlin noise values above
-//		or below the maximum base amplitude; the noise can be "normalized" by
-//		the caller (omitted from this function for optimization purposes) via:
-//				noise *= A / (A + (A * P))
 //		...where A is the <baseAmplitude> and P is the <persistance>.
 //	<persistance>: The fraction of amplitude of each subsequent octave, based on the amplitude of the previous octave.  For
 //		example, with a persistance of 0.3, each octave is only 30% as strong as the previous octave.
 //
-float ComputePerlinNoiseValueAtPosition2D( const Vector2& position, float perlinNoiseGridCellSize, int numOctaves, float baseAmplitude, float persistance )
+//--------------------------------------------------------------------------------------------------------------
+float ComputePerlinNoiseValueAtPosition2D( const Vector2& position, float perlinNoiseGridCellSize, int numOctaves, float persistence )
 {
-	if( numOctaves == 0 )
-		return 0.f;
+	float totalPerlinNoise = 0.f;
+	float currentOctaveAmplitude = 1.f;
+	float totalMaxAmplitude = 0.f;
+	float perlinGridFrequency = ( 1.f / perlinNoiseGridCellSize );
+	for ( int octaveNumber = 0; octaveNumber < numOctaves; ++octaveNumber )
+	{
+		Vector2 perlinPosition( position.x * perlinGridFrequency, position.y * perlinGridFrequency );
+		Vector2 perlinPositionFloor( (float)floor( perlinPosition.x ), (float)floor( perlinPosition.y ) );
+		IntVector2 perlinCell( (int)perlinPositionFloor.x, (int)perlinPositionFloor.y );
+		Vector2 perlinPositionUV = perlinPosition - perlinPositionFloor;
+		Vector2 perlinPositionAntiUV( perlinPositionUV.x - 1.f, perlinPositionUV.y - 1.f );
+		float eastWeight = SmoothStep( perlinPositionUV.x );
+		float northWeight = SmoothStep( perlinPositionUV.y );
+		float westWeight = 1.f - eastWeight;
+		float southWeight = 1.f - northWeight;
 
-	Vector2 perlinPosition = position / perlinNoiseGridCellSize;
-	Vector2 perlinPositionFloor( floor( perlinPosition.x ), floor( perlinPosition.y ) );
-	IntVector2 perlinCell( (int) perlinPositionFloor.x, (int) perlinPositionFloor.y );
-	Vector2 perlinPositionUV = perlinPosition - perlinPositionFloor;
-	Vector2 perlinPositionAntiUV( perlinPositionUV.x - 1.f, perlinPositionUV.y - 1.f );
-	float eastWeight = SmoothStep( perlinPositionUV.x );
-	float northWeight = SmoothStep( perlinPositionUV.y );
-	float westWeight = 1.f - eastWeight;
-	float southWeight = 1.f - northWeight;
+		Vector2 southwestNoiseGradient = GetPseudoRandomNoiseDirection2D( perlinCell.x, perlinCell.y );
+		Vector2 southeastNoiseGradient = GetPseudoRandomNoiseDirection2D( perlinCell.x + 1, perlinCell.y );
+		Vector2 northeastNoiseGradient = GetPseudoRandomNoiseDirection2D( perlinCell.x + 1, perlinCell.y + 1 );
+		Vector2 northwestNoiseGradient = GetPseudoRandomNoiseDirection2D( perlinCell.x, perlinCell.y + 1 );
 
-	Vector2 southwestNoiseGradient = GetPseudoRandomNoiseUnitVector2D( perlinCell.x, perlinCell.y );
-	Vector2 southeastNoiseGradient = GetPseudoRandomNoiseUnitVector2D( perlinCell.x + 1, perlinCell.y );
-	Vector2 northeastNoiseGradient = GetPseudoRandomNoiseUnitVector2D( perlinCell.x + 1, perlinCell.y + 1 );
-	Vector2 northwestNoiseGradient = GetPseudoRandomNoiseUnitVector2D( perlinCell.x, perlinCell.y + 1 );
+		float southwestDot = DotProduct( southwestNoiseGradient, perlinPositionUV );
+		float southeastDot = DotProduct( southeastNoiseGradient, Vector2( perlinPositionAntiUV.x, perlinPositionUV.y ) );
+		float northeastDot = DotProduct( northeastNoiseGradient, perlinPositionAntiUV );
+		float northwestDot = DotProduct( northwestNoiseGradient, Vector2( perlinPositionUV.x, perlinPositionAntiUV.y ) );
 
-	float southwestDot = DotProduct( southwestNoiseGradient, perlinPositionUV );
-	float southeastDot = DotProduct( southeastNoiseGradient, Vector2( perlinPositionAntiUV.x, perlinPositionUV.y ) );
-	float northeastDot = DotProduct( northeastNoiseGradient, perlinPositionAntiUV );
-	float northwestDot = DotProduct( northwestNoiseGradient, Vector2( perlinPositionUV.x, perlinPositionAntiUV.y ) );
+		float southBlend = ( eastWeight * southeastDot ) + ( westWeight * southwestDot );
+		float northBlend = ( eastWeight * northeastDot ) + ( westWeight * northwestDot );
+		float fourWayBlend = ( southWeight * southBlend ) + ( northWeight * northBlend );
+		float perlinNoiseForThisOctave = currentOctaveAmplitude * fourWayBlend;
 
-	float southBlend = (eastWeight * southeastDot) + (westWeight * southwestDot);
-	float northBlend = (eastWeight * northeastDot) + (westWeight * northwestDot);
-	float fourWayBlend = (southWeight * southBlend) + (northWeight * northBlend);
-	float perlinNoiseAtThisOctave = baseAmplitude * fourWayBlend;
+		totalPerlinNoise += perlinNoiseForThisOctave;
+		perlinGridFrequency *= 2.f;
+		totalMaxAmplitude += currentOctaveAmplitude;
+		currentOctaveAmplitude *= persistence;
+	}
 
-	float perlinNoiseFromAllHigherOctaves = ComputePerlinNoiseValueAtPosition2D( position,
-		0.5f * perlinNoiseGridCellSize, numOctaves - 1, baseAmplitude * persistance, persistance );
+	if ( totalMaxAmplitude != 0.f )
+		totalPerlinNoise /= totalMaxAmplitude;
 
-	float totalPerlinNoise = perlinNoiseAtThisOctave + perlinNoiseFromAllHigherOctaves;
 	return totalPerlinNoise;
 }

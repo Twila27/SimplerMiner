@@ -218,8 +218,8 @@ float GetPseudoRandomNoiseValueNegOneToOne3D( int positionX, int positionY, int 
 float GetPseudoRandomNoiseValueZeroToOne3D( int positionX, int positionY, int positionZ );
 float GetPseudoNoiseAngleRadians1D( int position );
 float GetPseudoNoiseAngleRadians2D( int positionX, int positionY );
-Vector2 GetPseudoRandomNoiseUnitVector2D( int positionX, int positionY );
-float ComputePerlinNoiseValueAtPosition2D( const Vector2& position, float perlinNoiseGridCellSize, int numOctaves, float baseAmplitude, float persistance );
+Vector2 GetPseudoRandomNoiseDirection2D( int positionX, int positionY );
+float ComputePerlinNoiseValueAtPosition2D( const Vector2& position, float perlinNoiseGridCellSize, int numOctaves, float persistance );
 
 
 //---------------------------------------------------------------------------
@@ -317,18 +317,19 @@ inline float GetPseudoNoiseAngleRadians2D( int positionX, int positionY )
 }
 
 
-//---------------------------------------------------------------------------
-inline Vector2 GetPseudoRandomNoiseUnitVector2D( int xPosition, int yPosition )
+//-----------------------------------------------------------------------------------------------
+inline Vector2 GetPseudoRandomNoiseDirection2D( int xPosition, int yPosition )
 {
-	const float ONE_OVER_MAX_POSITIVE_INT = (1.f / 2147483648.f);
-	const float SCALE_FACTOR = ONE_OVER_MAX_POSITIVE_INT * fTWO_PI;
-	int position = xPosition + (yPosition * 57);
-	int bits = (position << 13) ^ position;
-	int pseudoRandomPositiveInt = (bits * ((bits * bits * 15731) + 789221) + 1376312589) & 0x7fffffff;
-	float pseudoRandomFloatZeroToTwoPi = SCALE_FACTOR * (float) pseudoRandomPositiveInt;
+	const float ONE_OVER_MAX_POSITIVE_INT = ( 1.f / 2147483648.f );
+	const float SCALE_FACTOR = ONE_OVER_MAX_POSITIVE_INT * 360.f;
+	int position = xPosition + ( yPosition * 57 );
+	int bits = ( position << 13 ) ^ position;
+	int pseudoRandomPositiveInt = ( bits * ( ( bits * bits * 15731 ) + 789221 ) + 1376312589 ) & 0x7fffffff;
+	float pseudoRandomDegrees = SCALE_FACTOR * (float)pseudoRandomPositiveInt;
 
-	// TODO: Rewrite this to use the randomized int to look up Vector2 from a cos/sin table; vectors don't need to be super-precise,
-	//	and we certainly don't want to pay full price for cos/sin if this is merely going to be used for, say, Perlin noise gradiants.
-	//	Note however that cos/sin are typically pretty fast on GPUs so this can probably stand as-is in shader code.
-	return Vector2( cos( pseudoRandomFloatZeroToTwoPi ), sin( pseudoRandomFloatZeroToTwoPi ) );
+	// #TODO: Rewrite this to use the randomized int to look up Vector2 from a (small) cos/sin
+	//	table; vectors don't need to be super-precise, and we certainly don't want to pay full
+	//	price for cos/sin if this is merely going to be used for, say, Perlin noise gradients.
+	//	Note that cos/sin are typically fast on GPUs so this can probably stand in shader code.
+	return Vector2( CosDegrees( pseudoRandomDegrees ), SinDegrees( pseudoRandomDegrees ) );
 }

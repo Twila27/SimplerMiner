@@ -507,13 +507,12 @@ int Chunk::GetGroundHeightWithPerlinNoiseForColumn( GlobalColumnCoords globalCol
 		globalColumnCoords,
 		perlinGridCellSize,
 		perlinNumOctaves,
-		perlinAmplitude,
 		perlinPersistancePercentage
 		);
 
-	int groundHeight = static_cast<int>( perlinValue ) + minimumGroundHeight;
+	int groundHeight = static_cast<int>( perlinAmplitude * perlinValue ) + minimumGroundHeight;
 
-	return groundHeight;
+	return groundHeight < 0 ? 0 : groundHeight; //In the case that the Perlin value is negative.
 }
 
 
@@ -531,13 +530,13 @@ int Chunk::GetCeilingHeightWithPerlinNoiseForColumn( GlobalColumnCoords globalCo
 		globalColumnCoords,
 		perlinGridCellSize,
 		perlinNumOctaves,
-		perlinAmplitude,
 		perlinPersistancePercentage
 		);
 
-	int ceilingHeight = static_cast<int>( perlinValue ) + maximumCeilingHeight;
+	int ceilingHeight = (int)( perlinAmplitude * perlinValue ) + maximumCeilingHeight;
 
-	return ceilingHeight;
+
+	return ceilingHeight >= CHUNK_Z_HEIGHT_IN_BLOCKS ? CHUNK_Z_HEIGHT_IN_BLOCKS - 1 : ceilingHeight; //Don't exceed sky either.
 }
 
 
@@ -573,20 +572,19 @@ GlobalColumnCoords Chunk::LookForVillageCenterWithPerlinNoiseAroundColumn( Globa
 				columnToSearch,
 				VILLAGE_PERLIN_GRID_CELL_SIZE,
 				VILLAGE_PERLIN_GRID_NUM_OCTAVES,
-				VILLAGE_PERLIN_AMPLITUDE,
 				VILLAGE_PERLIN_GRID_PERSISTANCE
 				);
 
-			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( northNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_AMPLITUDE, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
+				if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( northNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
 				continue;
 			
-			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( southNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_AMPLITUDE, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
+			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( southNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
 				continue;
 			
-			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( eastNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_AMPLITUDE, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
+			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( eastNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
 				continue;
 			
-			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( westNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_AMPLITUDE, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
+			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( westNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
 				continue;
 
 			return columnToSearch; //At this point we know columnToSearch is a local maxima of the Perlin grid, i.e. a village center.
@@ -666,8 +664,8 @@ WorldCoordsXY Chunk::GetChunkMinsInWorldUnits() const
 {
 	WorldCoordsXY cciw;
 
-	cciw.x = static_cast<float>( m_chunkPosition.x * CHUNK_X_LENGTH_IN_BLOCKS );
-	cciw.y = static_cast<float>( m_chunkPosition.y * CHUNK_Y_WIDTH_IN_BLOCKS );
+	cciw.x = (float)( m_chunkPosition.x * CHUNK_X_LENGTH_IN_BLOCKS );
+	cciw.y = (float)( m_chunkPosition.y * CHUNK_Y_WIDTH_IN_BLOCKS );
 
 	return cciw;
 }
@@ -742,6 +740,7 @@ void Chunk::AddBlockToVertexArray( const Block& block, LocalBlockIndex blockInde
 	float heightScaling = 0.0f; //No scale by default.
 	float LADDER_OFFSET = .10f; //90% of way to block maxs.
 		//TODO: add this selectively based on the orientation of the ladder as set at time of PlaceBlock call.
+		//Clarification: right now all ladders will position themselves with facing with the same orientation.
 	if ( thisBlockType == LADDER )
 	{
 		tempTexCoords = ( g_useLightTestingTexture ? g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 0 ) : BlockDefinition::s_blockDefinitionRegistry[ block.GetBlockType() ].m_texCoordsSides );

@@ -1502,7 +1502,9 @@ BlockInfo World::GetBlockInfoFromWorldCoords( const WorldCoords& wc )
 {
 	WorldCoordsXY wc2D = WorldCoordsXY( wc.x, wc.y );
 	ChunkCoords chunkCoordsOfCurrentPos = GetChunkCoordsFromWorldCoordsXY( wc2D );
-	if ( m_activeChunks[ m_activeDimension ].count( chunkCoordsOfCurrentPos ) == 0 ) return BlockInfo(); //WorldCoords outside loaded chunks.
+
+	if ( m_activeChunks[ m_activeDimension ].count( chunkCoordsOfCurrentPos ) == 0 ) 
+		return BlockInfo(); //WorldCoords outside loaded chunks.
 
 	Chunk* currentChunk = m_activeChunks[ m_activeDimension ][ chunkCoordsOfCurrentPos ];
 	WorldCoordsXY currentChunkCoordsInWorldUnits = currentChunk->GetChunkMinsInWorldUnits(); //e.g. (1,0) becomes (16.f,0.f).
