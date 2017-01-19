@@ -711,13 +711,13 @@ void TheRenderer::UnbindTexture() //Actually just textured drawing with white 1x
 void TheRenderer::DrawSphere( const int vertexGroupingRule, const Vector3& centerPos, float radius, float numSlices, float numSidesPerSlice, const Rgba& tint /*= Rgba()*/, float lineThickness /*= 1.0f*/ )
 {
 	//TODO: BE SMARTER. Figure out how people actually render spheres. Clearly not spherical if looked at down a non-major axis!
+	UNREFERENCED_PARAMETER( numSlices );
 
 	UnbindTexture();
 
 	glLineWidth( lineThickness );
 
 	std::vector<Vertex3D_PCT> vertexes;
-	float stepBetweenRings = 1.f / numSlices;
 	
 	//Invoke DrawPolygon's logic along various interpolating heights.
 
