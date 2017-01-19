@@ -263,7 +263,8 @@ void Initialize( HINSTANCE applicationInstanceHandle )
 	IntVector2 screenCenter = IntVector2( (int)( g_theApp->GetScreenWidth() / 2.0 ), (int)( g_theApp->GetScreenHeight() / 2.0 ) );
 	g_theInput->SetCursorSnapToPos( screenCenter );
 	g_theInput->HideCursor();
-	
+	g_theInput->OnGainedFocus();
+
 	g_theRenderer = new TheRenderer();
 	g_theRenderCommands = new std::list< RenderCommand* >();
 }
