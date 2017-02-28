@@ -12,6 +12,8 @@
 
 class Chunk;
 
+//-----------------------------------------------------------------------------
+//Naming Windows Virtual Keybinds for Clarity
 #define STATIC
 #define VK_LBUTTON 0x01
 #define VK_RBUTTON 0x02
@@ -29,12 +31,10 @@ class Chunk;
 #define VK_F9 0x78
 
 //-----------------------------------------------------------------------------
-static const char* g_appName = "SimplerMiner Gold (Milestone 06) by Benjamin Gibson";
+static const char* g_appName = "SimplerMiner Gold (Milestone 06) by Benjamin D. Gibson";
 
 //-----------------------------------------------------------------------------
 //Debug Tools
-
-//TODO: add code in TheGame::Update that toggles these!
 extern bool g_useCulling;
 extern bool g_renderRaycasts;
 extern bool g_renderPlayerCollider;
@@ -66,12 +66,12 @@ extern char KEY_TO_TOGGLE_MOVEMENT_MODE;
 extern char KEY_TO_TOGGLE_VBO_AND_VA;
 extern char KEY_TO_TOGGLE_CULLING;
 
-//OLD--use Forseth Debug Suite now.
+//Old Debug Render Commands (use Engine/Rendering/RenderCommand now).
 extern std::vector< Vertex3D_PCT > g_debugPoints;
 inline void AddDebugPoint( const Vector3& position, const Rgba& color ) { g_debugPoints.push_back( Vertex3D_PCT(position, color) ); }
 void DrawDebugPoints( float pointSize, bool enableDepthTesting );
 
-//---
+//-----------------------------------------------------------------------------
 //Village
 
 static const int VILLAGE_RADIUS_Y_BLOCKS = 9; //Doesn't include center.
@@ -87,13 +87,12 @@ static const int VILLAGE_TREASURE_SHRINE_HEIGHT = 10;
 static const int VILLAGE_BLOCKS_FROM_CENTER_TO_CONSTRUCT_INCLUDING_CENTER = 3;
 
 //-----------------------------------------------------------------------------
-//Player;
-
+//Player
 static const float THRESHOLD_TO_BE_CONSIDERED_ON_GROUND = .15f;
 
 static const float PLAYER_INITIAL_HEIGHT = 90.f;
-static const float PLAYER_HEIGHT = 1.85f; //from A4 spec, to match Minecraft.
-static const float PLAYER_HALF_HEIGHT = PLAYER_HEIGHT * .5f; //for box trace, etc.
+static const float PLAYER_HEIGHT = 1.85f; //Adjusted to match Minecraft's number.
+static const float PLAYER_HALF_HEIGHT = PLAYER_HEIGHT * .5f; //For box trace, etc.
 static const float PLAYER_WIDTH = .6f; //Assuming this is along x and along y.
 static const float PLAYER_HALF_WIDTH = PLAYER_WIDTH * .5f;
 static const Vector3 PLAYER_DEFAULT_POSITION = Vector3( 0.f, 0.f, PLAYER_INITIAL_HEIGHT );
@@ -132,7 +131,6 @@ extern MovementMode g_currentMovementMode;
 
 //-----------------------------------------------------------------------------
 //Audio
-
 typedef unsigned int SoundID;
 static const float VOLUME_ADJUST = .15f;
 static const float SECONDS_BETWEEN_DIG_SOUNDS = .25f;
@@ -140,9 +138,8 @@ static const float DISTANCE_BETWEEN_WALK_SOUNDS = 1.f; //World units, or 1.0 per
 
 //-----------------------------------------------------------------------------
 //Lighting & Textures
-
 static const float LOWEST_LIGHT_RGBA_VALUE = 0.1f;
-static const int NUM_BITS_FOR_LIGHT_LEVEL = 4; //now 0-7, was originally 4 for 0-15. Needed bit for two stair/ladder orientation bits.
+static const int NUM_BITS_FOR_LIGHT_LEVEL = 4; //Now 0-7, was originally 4 for 0-15. Needed bit for two stair/ladder orientation bits.
 static const int MAX_LIGHTING_LEVEL = BIT( NUM_BITS_FOR_LIGHT_LEVEL ) - 1; //2^NUM_BITS minus one, for 0-based use.
 static const int NIGHT_LIGHTING_LEVEL = GetMax( 0, ( MAX_LIGHTING_LEVEL / 2 ) - 1 ); //-1 preserves 6 for max 15. Not speed-critical /'s here.
 static const int GLOWSTONE_LIGHT_LEVEL = GetMax( 0, ( ( 3 * MAX_LIGHTING_LEVEL ) / 4 ) + 1); //+1 preserves 12 for max 15.
@@ -152,7 +149,6 @@ static const int NUMBER_DIG_DAMAGE_FRAMES = 10;
 
 //-----------------------------------------------------------------------------
 //Chunk and block and dimension initialization.
-
 enum BlockType : unsigned char { 
 	AIR = 0, WATER, DIRT, GRASS, SAND, STONE, COBBLESTONE, GLOWSTONE,
 	STAIRS, LADDER, 
@@ -191,17 +187,16 @@ static const int CEILING_HEIGHT_OFFSET = 100;
 
 static const int NUM_DIRT_LAYERS = 6; //Between grass and stone, not including the grass layer.
 static const int SEA_LEVEL_HEIGHT_LIMIT = CHUNK_Z_HEIGHT_IN_BLOCKS / 2; //preserves z=64 for a max z=128.
-static const int NETHER_LAVA_HEIGHT_LIMIT = CHUNK_Z_HEIGHT_IN_BLOCKS / 4; //Not speed-critical /'s here.
+static const int NETHER_LAVA_HEIGHT_LIMIT = CHUNK_Z_HEIGHT_IN_BLOCKS / 4; //Not speed-critical divisions here.
 
 //Below constants used for the non-Perlin flat-world generation.
-static const int DIRT_EXCLUSIVE_HEIGHT_LIMIT = (int)( NUM_COLUMNS_PER_CHUNK * ( 0.515625f * CHUNK_Z_HEIGHT_IN_BLOCKS ) ); //preserves z=66 for a max z=128.
+static const int DIRT_EXCLUSIVE_HEIGHT_LIMIT = (int)( NUM_COLUMNS_PER_CHUNK * ( 0.515625f * CHUNK_Z_HEIGHT_IN_BLOCKS ) ); //Preserves z=66 for a max z=128.
 static const int STONE_EXCLUSIVE_HEIGHT_LIMIT = DIRT_EXCLUSIVE_HEIGHT_LIMIT - ( NUM_COLUMNS_PER_CHUNK * NUM_DIRT_LAYERS );
 static const int GRASS_EXCLUSIVE_HEIGHT_LIMIT = DIRT_EXCLUSIVE_HEIGHT_LIMIT + ( NUM_COLUMNS_PER_CHUNK + 1 );
 static const int AIR_EXCLUSIVE_HEIGHT_LIMIT = NUM_COLUMNS_PER_CHUNK * CHUNK_Z_HEIGHT_IN_BLOCKS;
 
 //-----------------------------------------------------------------------------
 //HUD
-
 static const Vector2 HUD_BOTTOM_LEFT_POSITION = Vector2( 100.f, 27.f ); //In from left, up from bottom of screen.
 static const float HUD_WIDTH_BETWEEN_ELEMENTS = 25.f;
 static const float HUD_ELEMENT_WIDTH = 50.f;
@@ -212,7 +207,6 @@ static const float HUD_CROSSHAIR_THICKNESS = 4.f;
 
 //-----------------------------------------------------------------------------
 //Coordinate System
-
 typedef Vector3 WorldCoords; //May be negative.
 typedef Vector2 WorldCoordsXY; //Just assume z = 0, e.g. (1,0) ChunkCoords should be (16.0f, 0.f) in ChunkCoordsInWorld. Used in chunk activation search grid.
 typedef Vector2 GlobalColumnCoords; //Mostly for chunk construction. Not IntVec2 because it's passed into ComputePerlin2D which takes float-based vector2.
@@ -232,7 +226,6 @@ static const Vector3 WORLD_BACKWARD = Vector3( -1.f, 0.f, 0.f );
 
 //-----------------------------------------------------------------------------
 //Flags in the byte-packed member variable of the Block class.
-
 static const unsigned char BLOCKFLAGS_LIGHT_LEVEL_BITMASK = MAX_LIGHTING_LEVEL; //Note used as unshifted and hence lowest order bits.
 static const unsigned char BLOCKFLAGS_IS_SKY_BITMASK = BIT( 7 ); //Nothing opaque above block to z-max, implies max light level.
 static const unsigned char BLOCKFLAGS_IS_LIGHTING_DIRTY_BITMASK = BIT( 6 ); //Whether block is in lighting's dirty-deque.
@@ -242,7 +235,7 @@ static const unsigned char BLOCKFLAGS_ORIENTATION_BITMASK = BIT( 4 ) | BIT( 3 );
 //--------------------------------------------------------------------------------------------------------------
 inline LocalBlockCoords GetLocalBlockCoordsFromLocalBlockIndex( LocalBlockIndex lbi )
 {
-	ASSERT_OR_DIE( lbi >= 0 && lbi < NUM_BLOCKS_PER_CHUNK, "LocalBlockIndex Out of Range" );
+	ASSERT_OR_DIE( ( lbi >= 0 ) && ( lbi < NUM_BLOCKS_PER_CHUNK ), "LocalBlockIndex Out of Range" );
 
 	LocalBlockCoords lbc;
 
@@ -251,9 +244,9 @@ inline LocalBlockCoords GetLocalBlockCoordsFromLocalBlockIndex( LocalBlockIndex 
 	lbc.y = ( lbi >> CHUNK_BITS_X ) & LOCAL_Y_BITMASK; //LOCAL_Y_BITMASK = CHUNK_Y_LENGTH_IN_BLOCKS - 1;
 	lbc.z = lbi >> BITS_PER_XY_LAYER;
 
-	ASSERT_OR_DIE( lbc.x >= 0 && lbc.x < CHUNK_X_LENGTH_IN_BLOCKS, "LocalBlockCoords.x Out of Range" );
-	ASSERT_OR_DIE( lbc.y >= 0 && lbc.y < CHUNK_Y_WIDTH_IN_BLOCKS, "LocalBlockCoords.y Out of Range" );
-	ASSERT_OR_DIE( lbc.z >= 0 && lbc.z < CHUNK_Z_HEIGHT_IN_BLOCKS, "LocalBlockCoords.z Out of Range" );
+	ASSERT_OR_DIE( ( lbc.x >= 0 ) && ( lbc.x < CHUNK_X_LENGTH_IN_BLOCKS ), "LocalBlockCoords.x Out of Range" );
+	ASSERT_OR_DIE( ( lbc.y >= 0 ) && ( lbc.y < CHUNK_Y_WIDTH_IN_BLOCKS ), "LocalBlockCoords.y Out of Range" );
+	ASSERT_OR_DIE( ( lbc.z >= 0 ) && ( lbc.z < CHUNK_Z_HEIGHT_IN_BLOCKS ), "LocalBlockCoords.z Out of Range" );
 
 	return lbc;
 }
@@ -273,4 +266,4 @@ const char* GetDimensionAsString( Dimension dimension );
 LocalBlockCoords GetLocalBlockCoordsFromLocalBlockIndexNoBitMath( LocalBlockIndex lbi );
 LocalBlockIndex GetLocalBlockIndexFromLocalBlockCoordsNoBitMath( const LocalBlockCoords& lbc );
 GlobalBlockCoords GetGlobalBlockCoordsFromChunkAndLocalBlockIndex( const Chunk* chunkOfBlock, LocalBlockIndex blockIndexInChunk );
-GlobalBlockCoords GetGlobalBlockCoordsFromChunkAndLocalBlockCoords( const Chunk* chunkOfBlock, int lbcX, int lbcY, int lbcZ ); //Because VSwatch doesn't support ctor calling.
+GlobalBlockCoords GetGlobalBlockCoordsFromChunkAndLocalBlockCoords( const Chunk* chunkOfBlock, int lbcX, int lbcY, int lbcZ ); //Because VS-watch doesn't support ctor calling.

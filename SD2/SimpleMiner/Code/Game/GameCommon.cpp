@@ -6,7 +6,6 @@
 
 //--------------------------------------------------------------------------------------------------------------
 //Externed Variables' Definitions
-
 bool g_useCulling = true;
 bool g_renderRaycasts = true; //No toggle key currently.
 bool g_renderPlayerCollider = true;
@@ -94,7 +93,7 @@ LocalBlockIndex GetLocalBlockIndexFromLocalBlockCoordsNoBitMath( const LocalBloc
 //--------------------------------------------------------------------------------------------------------------
 LocalBlockCoords GetLocalBlockCoordsFromLocalBlockIndexNoBitMath( LocalBlockIndex lbi )
 {
-	ASSERT_OR_DIE( lbi >= 0 && lbi < NUM_BLOCKS_PER_CHUNK, "LocalBlockIndex Out of Range" );
+	ASSERT_OR_DIE( ( lbi >= 0 ) && ( lbi < NUM_BLOCKS_PER_CHUNK ), "LocalBlockIndex Out of Range" );
 
 	LocalBlockCoords lbc;
 
@@ -104,7 +103,7 @@ LocalBlockCoords GetLocalBlockCoordsFromLocalBlockIndexNoBitMath( LocalBlockInde
 	lbc.y = ( lbi / CHUNK_X_LENGTH_IN_BLOCKS ) % CHUNK_Y_WIDTH_IN_BLOCKS;
 	
 	//Earning +1 positive z-coordinate per [length]x[width] x's and y's.
-	lbc.z = lbi / ( NUM_COLUMNS_PER_CHUNK );
+	lbc.z = lbi / NUM_COLUMNS_PER_CHUNK;
 
 	return lbc;
 }
@@ -141,8 +140,8 @@ const char* GetDimensionAsString(Dimension dimension)
 {
 	switch ( dimension )
 	{
-	case DIM_OVERWORLD: return "Overworld";
-	case DIM_NETHER: return "Nether";
-	default: return "UnnamedDimension";
+		case DIM_OVERWORLD: return "Overworld";
+		case DIM_NETHER: return "Nether";
+		default: return "UnnamedDimension";
 	}
 }
