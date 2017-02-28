@@ -42,7 +42,7 @@ public:
 	Vector3 m_worldPosition; //Tie with the bounding volumes in Update().
 	Vector3 m_velocity;
 
-	//Update all three bounding volumes, but only use the active one.
+	//Update all three bounding volumes, but only use the active one, affording switching for easier comparative tests.
 	enum PlayerColliderType { BOX, CAN, PILL };
 	PlayerColliderType m_activeColliderType;
 	PlayerBoxCollider m_boxBounds;
@@ -52,10 +52,10 @@ public:
 	void Render();
 	void UpdateCollidersAndDigTime( float deltaSeconds );
 
-	bool IsDigging() const { return m_isDigging; }
-	float GetSecondsSpentDigging() const { return m_secondsSpentDigging; }
-	void StartDigging() { m_isDigging = true; }
-	void StopDigging() { m_isDigging = false; m_secondsSpentDigging = 0.f; }
+	inline bool IsDigging() const { return m_isDigging; }
+	inline float GetSecondsSpentDigging() const { return m_secondsSpentDigging; }
+	inline void StartDigging() { m_isDigging = true; }
+	inline void StopDigging() { m_isDigging = false; m_secondsSpentDigging = 0.f; }
 
 	WorldCoords GetFeetPos();
 	WorldCoords GetHeadPos();

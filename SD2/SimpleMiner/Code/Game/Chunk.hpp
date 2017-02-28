@@ -13,6 +13,7 @@
 //-----------------------------------------------------------------------------
 class SpriteSheet;
 struct BlockInfo;
+#define BLOCK_UNHIGHLIGHTED (99999)
 
 
 //-----------------------------------------------------------------------------
@@ -22,9 +23,10 @@ public:
 
 	enum ChunkCornerPosition {
 		NORTHWEST_TOP = 0, NORTHEAST_TOP, SOUTHWEST_TOP, SOUTHEAST_TOP,
-		NORTHWEST_BOTTOM, NORTHEAST_BOTTOM, SOUTHWEST_BOTTOM, SOUTHEAST_BOTTOM, NUM_CHUNK_CORNERS
+		NORTHWEST_BOTTOM, NORTHEAST_BOTTOM, SOUTHWEST_BOTTOM, SOUTHEAST_BOTTOM, 
+		NUM_CHUNK_CORNERS
 	};
-	WorldCoords m_chunkCornersInWorldUnits[ 8 ]; //TODO: organize!
+	WorldCoords m_chunkCornersInWorldUnits[ 8 ];
 
 	Chunk( ChunkCoords chunkPosition, Dimension chunkDimension );
 	~Chunk();
@@ -52,8 +54,8 @@ public:
 	WorldCoords GetWorldCoordsFromLocalBlockIndex( LocalBlockIndex lbi ) const;
 	inline Dimension Chunk::GetDimension() const { return m_chunkDimension; }
 
-	bool IsHighlighting() const { return m_selectedFace == NONE || m_selectedBlock < NUM_BLOCKS_PER_CHUNK; }
-	void Unhighlight() { m_selectedBlock = 99999; m_selectedFace = NONE; }
+	inline bool IsHighlighting() const { return ( m_selectedFace == NONE ) || ( m_selectedBlock < NUM_BLOCKS_PER_CHUNK ); }
+	void Unhighlight() { m_selectedBlock = BLOCK_UNHIGHLIGHTED; m_selectedFace = NONE; }
 	void HighlightBlock( LocalBlockIndex lbi, Vector3 directionOppositeFace );
 	Block* GetBlockFromLocalBlockIndex( LocalBlockIndex m_myBlockIndex );
 	Block* GetBlockFromLocalBlockCoords( const LocalBlockCoords& lbc );
@@ -78,9 +80,8 @@ private:
 	void AddBlockToVertexArray( const Block& block, LocalBlockIndex blockIndex, std::vector< Vertex3D_PCT >& out_vertexArray );
 
 	void RenderWithDrawAABB() const;
-	void RenderBlockWithDrawAABB( BlockType blockType, const WorldCoords& renderBoundsMins, const Vector3& blockSize = Vector3( 1.f, 1.f, 1.f ) ) const;
+	void RenderBlockWithDrawAABB( BlockType blockType, const WorldCoords& renderBoundsMins, const Vector3& blockSize = Vector3::ONE ) const;
 
-	void SetSelectedFace( const Vector3& directionOppositeFace );
 	Rgba GetLightColorForLightLevel( int lightLevel ) const;
 	void PopulateColumnWithOverworldBlocksWithPerlinNoise( int columnIndex, int groundHeight );
 	void PopulateColumnWithNetherBlocksWithPerlinNoise( GlobalColumnCoords globalColumnCoords, int columnIndex, int groundHeight );
@@ -95,13 +96,14 @@ private:
 	GlobalColumnCoords LookForVillageCenterWithPerlinNoiseAroundColumn( GlobalColumnCoords globalColumnCoords );
 	void BuildPond( GlobalBlockCoords pondWorldMins, GlobalBlockCoords pondWorldMaxs );
 
-
+	void SetSelectedFace( const Vector3& directionOppositeFace );
 	void SetBlockTypeIfLocal( GlobalBlockCoords blockGlobalMins, BlockType newType );
+
 	Block m_blocks[ NUM_BLOCKS_PER_CHUNK ];
 	unsigned int m_vboID;
 	std::vector< Vertex3D_PCT > m_vertexes; //ONLY stored into when the debug flag to use vertex arrays is on.
 	ChunkCoords m_chunkPosition; //e.g. (1,0) means 1 chunk forward (+x) from origin.
-	bool m_isVertexArrayDirty; //Set on dig/place.
+	bool m_isVertexArrayDirty; //Set upon dig/place.
 	int m_currentSkyLightLevel;
 	bool m_isVisible;
 	unsigned int m_numVertexes;

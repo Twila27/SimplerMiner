@@ -53,7 +53,7 @@ LRESULT CALLBACK WindowsMessageHandlingProcedure( HWND windowHandle, UINT wmMess
 		return 0;
 
 	case WM_KEYDOWN:
-			g_theInput->SetKeyDownStatus( asKey, true );
+		g_theInput->SetKeyDownStatus( asKey, true );
 		if ( asKey == VK_ESCAPE )
 		{
 			g_isQuitting = true;
@@ -184,9 +184,7 @@ void RunMessagePump( )
 	{
 		const BOOL wasMessagePresent = PeekMessage( &queuedMessage, NULL, 0, 0, PM_REMOVE );
 		if ( !wasMessagePresent )
-		{
 			break;
-		}
 
 		TranslateMessage( &queuedMessage );
 		DispatchMessage( &queuedMessage );
@@ -253,8 +251,9 @@ void Initialize( HINSTANCE applicationInstanceHandle )
 	g_theApp = new TheApp( VIEW_RIGHT, VIEW_TOP );
 
 	g_theAudio = new AudioSystem();
-	//SoundID musicID;
-	//musicID = g_theAudio->CreateOrGetSound( "Data/Audio/Yume Nikki mega mix (SD).mp3" );
+
+	//Short example for global background music, kept out for portfolio:
+	//SoundID musicID = g_theAudio->CreateOrGetSound( "Data/Audio/Yume Nikki mega mix (SD).mp3" );
 	//g_bgMusicChannel = g_theAudio->PlaySound( musicID );
 
 	g_theGame = new TheGame();

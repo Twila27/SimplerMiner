@@ -5,11 +5,13 @@
 #include "Engine/Renderer/TheRenderer.hpp"
 
 
+//--------------------------------------------------------------------------------------------------------------
 STATIC const float Player::COLLIDER_NUM_SLICES = 20.f;
 STATIC const float Player::COLLIDER_NUM_SIDES_PER_SLICE = 20.f;
 STATIC const Vector3 Player::CENTER_OFFSET = Vector3( PLAYER_WIDTH, PLAYER_WIDTH, PLAYER_HEIGHT ) * 0.5f;
 
 
+//--------------------------------------------------------------------------------------------------------------
 Player::Player( const Vector3& worldPosition, const Vector3& velocity /*= Vector3::ZERO */ )
 	: m_worldPosition( worldPosition )
 	, m_velocity( velocity )
@@ -18,6 +20,7 @@ Player::Player( const Vector3& worldPosition, const Vector3& velocity /*= Vector
 	, m_isDigging( false )
 {
 }
+
 
 //--------------------------------------------------------------------------------------------------------------
 void Player::Render()
@@ -43,16 +46,12 @@ void Player::Render()
 //--------------------------------------------------------------------------------------------------------------
 void Player::UpdateCollidersAndDigTime( float deltaSeconds )
 {
-	//Move the UpdatePlayer stuff here in future?
-
 	//The m_worldPosition that gets updated is to be treated as the center of our bounding volume.
 	m_boxBounds.mins = m_worldPosition - CENTER_OFFSET;
 	m_boxBounds.maxs = m_worldPosition + CENTER_OFFSET;
 
-	//m_pillBounds = PlayerPillCollider();
-	//m_canBounds =
-
-	if ( m_isDigging ) m_secondsSpentDigging += deltaSeconds;
+	if ( m_isDigging )
+		m_secondsSpentDigging += deltaSeconds;
 }
 
 
