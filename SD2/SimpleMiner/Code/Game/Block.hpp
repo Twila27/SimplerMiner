@@ -11,7 +11,11 @@ class Block
 {
 public:
 
-	Block( BlockType type = AIR ) : m_type( type ), m_bitFlags( 0 ) {}
+	Block( BlockType type = AIR ) 
+		: m_type( type )
+		, m_bitFlags( 0 ) 
+	{
+	}
 	
 	inline int GetLightLevel() const;
 	inline void SetLightLevel( int clampedNewLightLevel );
@@ -32,18 +36,13 @@ public:
 	void SetBlockType( BlockType type );
 
 private:
-
-	BlockType m_type;
-
-
-private:
-
 	inline void ClearLightLevelBits();
 	inline void ClearSkyBit();
 	inline void ClearDirtyLightingBit();
 	inline void ClearOpaqueBit();
 
 	unsigned char m_bitFlags; //See accessors.
+	BlockType m_type;
 };
 
 
@@ -64,9 +63,11 @@ inline void Block::ClearLightLevelBits()
 //--------------------------------------------------------------------------------------------------------------
 inline void Block::SetLightLevel( int clampedNewLightLevel )
 {
-	ASSERT_OR_DIE( clampedNewLightLevel >= 0 && clampedNewLightLevel <= MAX_LIGHTING_LEVEL, 
-				   Stringf( "SetLightLevel Given Argument Beyond Max Level %i", MAX_LIGHTING_LEVEL ) );
-	ClearLightLevelBits( ); m_bitFlags |= clampedNewLightLevel;
+	const std::string lightMaxExceededStr = Stringf( "SetLightLevel Given Argument Beyond Max Level %i", MAX_LIGHTING_LEVEL );
+	ASSERT_OR_DIE( ( clampedNewLightLevel >= 0 ) && ( clampedNewLightLevel <= MAX_LIGHTING_LEVEL ), lightMaxExceededStr );
+
+	ClearLightLevelBits();
+	m_bitFlags |= clampedNewLightLevel;
 }
 
 

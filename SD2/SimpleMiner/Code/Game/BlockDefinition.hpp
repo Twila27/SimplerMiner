@@ -25,11 +25,11 @@ struct BlockDefinition
 	std::vector< SoundID > m_diggingSounds;
 
 	static void InitializeBlockDefinitions();
-	static bool IsSolid( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_isSolid; } //Things that aren't solid can't be selected by raycast or collided with.
-	static bool IsOpaque( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_isOpaque; } //Things that aren't opaque don't occlude faces in HSR and end lighting column descents.
-	static int GetLightLevel( BlockType type );
-	static float GetSecondsToBreak( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_toughness; }
-	static AABB2 GetSideTexCoords( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_texCoordsSides; }
+	static inline bool IsSolid( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_isSolid; } //Things that aren't solid can't be selected by raycast or collided with.
+	static inline bool IsOpaque( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_isOpaque; } //Things that aren't opaque don't occlude faces in HSR and end lighting column descents.
+	static inline int GetLightLevel( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_emittedLightLevel; }
+	static inline float GetSecondsToBreak( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_toughness; }
+	static inline AABB2 GetSideTexCoords( BlockType type ) { return s_blockDefinitionRegistry[ type ].m_texCoordsSides; }
 	static void PlayBreakingSound( BlockType blockTypeBroken );
 	static void PlayPlacingSound( BlockType blockTypePlaced );
 	static void PlayDiggingSound( BlockType blockTypeDug, float deltaSeconds );
