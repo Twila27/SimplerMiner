@@ -90,7 +90,7 @@ void XboxController::MapControlSticks( short sThumbLX, short sThumbLY, short sTh
 
 
 //-----------------------------------------------------------------------------
-void XboxController::UpdateButtonStates( WORD wButtons )
+void XboxController::UpdateButtonStates( unsigned short wButtons )
 {
 	bool resultOfBitmasks;
 

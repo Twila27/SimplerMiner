@@ -1,6 +1,5 @@
 #include "Game/World.hpp"
 
-
 #include "Engine/Error/ErrorWarningAssert.hpp"
 #include "Engine/FileUtils/FileUtils.hpp"
 #include "Engine/String/StringUtils.hpp"
@@ -13,8 +12,10 @@
 #include "Game/Player.hpp"
 
 
+//--------------------------------------------------------------------------------------------------------------
 STATIC SoundID World::m_hudChangeSoundID = 0;
 STATIC float World::m_distanceSinceLastWalkSound = 0.f;
+
 
 //--------------------------------------------------------------------------------------------------------------
 World::World( Camera3D* camera, Player* player )
@@ -28,8 +29,8 @@ World::World( Camera3D* camera, Player* player )
 	, m_blockBeingDug( new BlockInfo() )
 	, m_activeDimension( DIM_OVERWORLD )
 {
-	ASSERT_OR_DIE( m_activeRadius < m_flushRadius, "Active Exceeds Flush Radius!" ); //Ensure chunk can't activate and flush at once.
-	ASSERT_OR_DIE( (m_activeRadius - m_flushRadius) % CHUNK_X_LENGTH_IN_BLOCKS == 0, "Active/Flush Radii Not a Chunk-multiple Apart!" ); //Not a speed-critical %.
+	ASSERT_OR_DIE( m_activeRadius < m_flushRadius, "Active Exceeds Flush Radius!" ); //Ensures a chunk can't activate and flush at the same time.
+	ASSERT_OR_DIE( ( (m_activeRadius - m_flushRadius) % CHUNK_X_LENGTH_IN_BLOCKS ) == 0, "Active/Flush Radii Not a Chunk-multiple Apart!" ); //Not a speed-critical %.
 
 	BlockDefinition::InitializeBlockDefinitions();
 	LoadPlayerFile( "Data/Saves/Player.txt" );
@@ -46,11 +47,9 @@ World::~World()
 
 	for ( int dimensionIndex = 0; dimensionIndex < NUM_DIMENSIONS; dimensionIndex++ )
 	{
-		auto chunkIterEnd = m_activeChunks[ dimensionIndex ].end( );
-		for ( auto chunkIter = m_activeChunks[ dimensionIndex ].begin( ); chunkIter != chunkIterEnd; ++chunkIter )
-		{
-			delete chunkIter->second;
-		}
+		const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ dimensionIndex ];
+		for ( const std::pair< ChunkCoords, Chunk* >& chunk : activeChunksInActiveDimension )
+			delete chunk.second;
 	}
 }
 
@@ -74,7 +73,9 @@ bool World::IsChunkVisible( const Chunk& chunk ) const
 		Vector3 cameraToChunkCornerDisp = chunk.m_chunkCornersInWorldUnits[ chunkCornerIndex ] - m_player->m_worldPosition;
 
 		//If any dot products of 3D camera forward XYZ vector and the chunk corner world positions are negative, don't render.
-		if ( DotProduct( cameraToChunkCornerDisp, m_playerCamera->GetForwardXYZ() ) > 0.f ) return true;
+		const Vector3& cameraForward = m_playerCamera->GetForwardXYZ();
+		if ( DotProduct( cameraToChunkCornerDisp, cameraForward ) > 0.f )
+			return true;
 	}
 
 	return false;
@@ -92,14 +93,12 @@ void World::Render() const
 	g_theRenderer->EnableDepthTesting( true );
 	m_player->Render();
 
-	auto chunkIterEnd = m_activeChunks[ m_activeDimension ].end();
-	for ( auto chunkIter = m_activeChunks[ m_activeDimension ].begin( ); chunkIter != chunkIterEnd; ++chunkIter )
+	const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 	{
-		const Chunk& chunk = *chunkIter->second;
+		const Chunk& chunk = *activeChunkPair.second;
 		if ( IsChunkVisible( chunk ) )
-		{
 			RenderChunk( chunk );
-		}
 	}
 }
 
@@ -108,36 +107,48 @@ void World::Render() const
 void World::Update( float deltaSeconds )
 {
 	UpdateCameraAndPlayer( deltaSeconds ); //Because movement == camera == player.
-	if ( g_flushChunksEnabled ) DeactivateFarthestObsoleteChunk(); //Deactivate comes before activate if for example close to memory limit, we wouldn't want to allocate when we can free first.
-	if ( g_activateChunksEnabled ) ActivateNearestMissingChunk(); //Name implies if there's more than one missing, we'll only activate one--and if none missing, none activated.		
+
+	if ( g_flushChunksEnabled ) 
+		DeactivateFarthestObsoleteChunk(); //Deactivate comes before activate if for example close to memory limit, we wouldn't want to allocate when we can free first.
+
+	if ( g_activateChunksEnabled ) 
+		ActivateNearestMissingChunk(); //Name implies if there's more than one missing, we'll only activate one--and if none missing, none activated.		
+
 	UpdateChunks(); //I have a TNT that went off, started fires, etc. but I will also change lighting. i.e. these are events inside the chunk like grass propagating.
+
 	UpdateLighting(); //Because lights spill chunk to chunk, so it can't be in a chunk.
 		//Chunks hold the blocks that know they are dirty and their light levels--so in global list of lighting-dirty blocks, may or may not be same-chunk.
 		//"While they are any dirty blocks left, process the next lighting-dirty block."
-	if ( g_updateVertexDataEnabled ) UpdateDirtyVertexArrays();
+
+	if ( g_updateVertexDataEnabled )
+		UpdateDirtyVertexArrays();
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void World::UpdateCameraAndPlayer( float deltaSeconds )
+void World::CheckForDimensionWarp()
 {
-
-	UnhighlightSelectedBlock(); //Dirties a chunk in process, TODO: revise.
-
-	BlockType blockTypeAtPlayerFeet = GetBlockTypeFromWorldCoords( m_player->GetFeetPos() );
+	const WorldCoords& playerFeetPos = m_player->GetFeetPos();
+	BlockType blockTypeAtPlayerFeet = GetBlockTypeFromWorldCoords( playerFeetPos );
 
 	//Dimension warping.
-	if ( blockTypeAtPlayerFeet == BlockType::PORTAL || g_theInput->WasKeyPressedOnce( 'N' ) )
+	if ( ( blockTypeAtPlayerFeet == BlockType::PORTAL ) || g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_DIMENSION ) )
 	{
 		m_activeDimension = ( m_activeDimension == DIM_OVERWORLD ? DIM_NETHER : DIM_OVERWORLD );
 
-		if ( m_activeDimension == DIM_NETHER ) 
+		if ( m_activeDimension == DIM_NETHER )
 			m_player->m_worldPosition.z = CEILING_HEIGHT_OFFSET - 5.f; //To get out of ceiling.
 
 		if ( m_activeDimension == DIM_OVERWORLD )
-				m_player->m_worldPosition.z = CHUNK_Z_HEIGHT_IN_BLOCKS - 1.f; //To clear player head.
+			m_player->m_worldPosition.z = CHUNK_Z_HEIGHT_IN_BLOCKS - 1.f; //To clear player head.
 	}
+}
 
+
+//--------------------------------------------------------------------------------------------------------------
+void World::CheckForHotbarChange()
+{
+	//Hotbar.
 	if ( g_theInput->IsKeyDown( '1' ) ) m_activeHudElement = 0;
 	else if ( g_theInput->IsKeyDown( '2' ) ) m_activeHudElement = 1;
 	else if ( g_theInput->IsKeyDown( '3' ) ) m_activeHudElement = 2;
@@ -157,21 +168,37 @@ void World::UpdateCameraAndPlayer( float deltaSeconds )
 		}
 
 		m_activeHudElement = WrapNumberWithinCircularRange
-		( 
-			m_activeHudElement, 
-			0,
-			NUM_BLOCK_TYPES - 1 //SKIP AIR.
-		); 
-			
+			(
+				m_activeHudElement,
+				0,
+				NUM_BLOCK_TYPES - 1 //SKIP AIR.
+				);
+
 	}
 	if ( m_lastFrameHudElement != m_activeHudElement )
 		g_theAudio->PlaySound( m_hudChangeSoundID, VOLUME_ADJUST );
 
 	m_lastFrameHudElement = m_activeHudElement;
+}
+
+
+//--------------------------------------------------------------------------------------------------------------
+void World::UpdateCameraAndPlayer( float deltaSeconds )
+{
+	UnhighlightSelectedBlock(); //Dirties a chunk in process.
+
+	CheckForDimensionWarp();
+
+	CheckForHotbarChange();
 
 	//--------------------------------------------------
 	//Keyboard.
-	if ( g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_MOVEMENT_MODE ) ) g_currentMovementMode = (MovementMode)WrapNumberWithinCircularRange( g_currentMovementMode + 1, 0, NUM_MOVEMENT_MODES );
+	if ( g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_MOVEMENT_MODE ) )
+	{
+		constexpr int MIN_MOVE_MODE_VALUE = 0;
+		int boundedModeNumber = WrapNumberWithinCircularRange( g_currentMovementMode + 1, MIN_MOVE_MODE_VALUE, NUM_MOVEMENT_MODES );
+		g_currentMovementMode = (MovementMode)boundedModeNumber;
+	}
 
 	Vector3& playerPos = m_player->m_worldPosition;
 	Vector3& cameraPos = m_playerCamera->m_worldPosition;
@@ -185,27 +212,20 @@ void World::UpdateCameraAndPlayer( float deltaSeconds )
 
 	UpdateFromMovementKeys( deltaSeconds, camForwardXY, camLeftXY, posToMove );
 
-	if ( g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_PLAYER_COLLIDER ) ) g_renderPlayerCollider = !g_renderPlayerCollider;
+	if ( g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_PLAYER_COLLIDER ) ) 
+		g_renderPlayerCollider = !g_renderPlayerCollider;
+
 	m_player->UpdateCollidersAndDigTime( deltaSeconds );
 
-	//--------------------------------------------------
-	//Mouse!
 	UpdateMouseAndCameraOffset( cameraPos, playerPos, camDirection );
 
-
-	//--------------------------------------------------
-	//Controller.
-	//const XboxController& controller = g_theInput->GetController( 0 );
-	//const XboxStickState& leftStick = controller.GetStickState( XBOX_STICK_LEFT );
-	//float fwdStrength = leftStick.m_correctedNormalizedY; //Positive is forward, so this is how much of the fwd vec we apply.
-	//float leftStrength = -1.f * leftStick.m_correctedNormalizedX;
-	//Vector3 moveIntent = (camForwardXY * fwdStrength) + (camLeftXY * leftStrength);
-	//m_cam.m_position += moveIntent * deltaMove;
-
 	//Raycast enclosed by defensive code against rays cast from outside sky/ground limit.
-	if ( playerPos.z < 0 || playerPos.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) return;
+	if ( ( playerPos.z < 0 ) || ( playerPos.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) )
+		return;
+
 	Vector3 endOfRay = playerPos + ( camDirection * LENGTH_OF_SELECTION_RAYCAST );
-	if ( endOfRay.z < 0 || endOfRay.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) return;
+	if ( ( endOfRay.z < 0 ) || ( endOfRay.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) )
+		return;
 
 	SelectBlock( playerPos, endOfRay, deltaSeconds );
 }
@@ -219,10 +239,11 @@ void World::UpdateFromMovementKeys( float deltaSeconds, const Vector3& camForwar
 	Vector3& playerVel = m_player->m_velocity;
 	BlockType blockTypeAtPlayerFeet = GetBlockTypeFromWorldCoords( m_player->GetFeetPos() );
 
+	//Player physics!
 	if ( g_theInput->IsKeyDown( KEY_TO_MOVE_BACKWARD ) )
 	{
 		if ( g_theInput->WasKeyJustPressed( KEY_TO_MOVE_FORWARD ) ) 
-			playerVel *= ( 1.f - HORIZONTAL_DECEL_BEFORE_STOP_KNOB ); //Applying drag/friction-stop to move abruptly in an opposite direction.
+			playerVel *= ( 1.f - HORIZONTAL_DECEL_BEFORE_STOP_KNOB ); //Applying drag/friction-stop for moving abruptly in an opposite direction.
 
 		playerVel -= camForwardXY;
 	}
@@ -251,7 +272,7 @@ void World::UpdateFromMovementKeys( float deltaSeconds, const Vector3& camForwar
 
 	playerVel.z += ( g_currentMovementMode == WALKING ) ? ( PLAYER_GRAVITY_FORCE * deltaSeconds ) : 0.f; //Note *dt makes it an accel.
 	
-	if ( g_theInput->WasKeyPressedOnce( KEY_TO_MOVE_UP ) && g_currentMovementMode == WALKING && IsPlayerOnGround() ) 
+	if ( g_theInput->WasKeyPressedOnce( KEY_TO_MOVE_UP ) && ( g_currentMovementMode == WALKING ) && IsPlayerOnGround() ) 
 		playerVel.z += PLAYER_JUMP_SPEED * speedUp;
 
 	if ( g_currentMovementMode != WALKING )
@@ -266,13 +287,11 @@ void World::UpdateFromMovementKeys( float deltaSeconds, const Vector3& camForwar
 	//Friction-stopping.
 	ApplyFrictionStopping( playerVel, blockTypeAtPlayerFeet );
 
-	//Ladder boost. TODO: Make function!
-	if ( blockTypeAtPlayerFeet == LADDER && g_theInput->IsKeyDown( KEY_TO_MOVE_FORWARD ) )
-	{
+	//Ladders implemented right here as an upward velocity boost while bumping against a ladder.
+	if ( ( blockTypeAtPlayerFeet == LADDER ) && g_theInput->IsKeyDown( KEY_TO_MOVE_FORWARD ) )
 		playerVel.z = LADDER_RISING_SPEED_KNOB * deltaSecondsSpeedBoosted;
-	}
 
-
+	//"Preventive" physics implemented here: scaling down velocity BEFORE clipping blocks, rather than pushing out of them correctively after a clip.
 	if ( playerVel != Vector3::ZERO )
 	{
 		playerVel = GetPhysicsCorrectedVelocityForDeltaSeconds( playerVel, posToMove, deltaSecondsSpeedBoosted );
@@ -291,16 +310,19 @@ void World::UpdateFromMovementKeys( float deltaSeconds, const Vector3& camForwar
 		PlayWalkingSound( moveVector.CalcLength() );
 	}
 
-	//"Corrective physics" for z-axis:
-	if ( posToMove.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) posToMove.z = CHUNK_Z_HEIGHT_IN_BLOCKS - PLAYER_HALF_HEIGHT; //Ceiling.
-	if ( posToMove.z < 0 ) posToMove.z = PLAYER_HALF_HEIGHT; //Floor.
+	//However, still using "corrective" player collision physics for z-axis:
+	if ( posToMove.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) 
+		posToMove.z = CHUNK_Z_HEIGHT_IN_BLOCKS - PLAYER_HALF_HEIGHT; //Ceiling.
+
+	if ( posToMove.z < 0 ) 
+		posToMove.z = PLAYER_HALF_HEIGHT; //Floor.
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
 void World::ApplyFrictionStopping( Vector3 &playerVel, BlockType blockTypeForPlayerFeet )
 {
-	if (
+	if  (
 			!( g_theInput->IsKeyDown( KEY_TO_MOVE_BACKWARD )
 			|| g_theInput->IsKeyDown( KEY_TO_MOVE_FORWARD )
 			|| g_theInput->IsKeyDown( KEY_TO_MOVE_LEFT )
@@ -332,9 +354,11 @@ void World::ApplyFrictionStopping( Vector3 &playerVel, BlockType blockTypeForPla
 
 
 //--------------------------------------------------------------------------------------------------------------
+//The core of the preventive player collision physics implementation.
 Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& velocityToPrevent, Vector3& posToMove, float deltaSeconds )
 {
-	if ( g_currentMovementMode == NOCLIP ) return velocityToPrevent; //Allowed unscaled velocity to clip past solid blocks in Noclip mode.
+	if ( g_currentMovementMode == NOCLIP ) 
+		return velocityToPrevent; //Allowed unscaled velocity to clip past solid blocks in Noclip mode.
 
 	//First implementation of preventive phyics: Scale down the velocity by the min of 12 raycasts from the player's box top, bottom, and midpoint's 4 corners.
 	RaycastResult3D minHitResult;
@@ -342,7 +366,7 @@ Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& veloci
 	Vector3 newRedirectedVelocity = velocityToPrevent; //Initial start at the unscaled, uncorrected velocity values.
 	Vector3 lastIterationVelocity;
 
-	while ( newRedirectedVelocity != lastIterationVelocity || newRedirectedVelocity == Vector3::ZERO )
+	while ( ( newRedirectedVelocity != lastIterationVelocity ) || ( newRedirectedVelocity == Vector3::ZERO ) )
 	{
 		lastIterationVelocity = newRedirectedVelocity; //If the latter hasn't changed by end of loop, nothing to re-check and we're done.
 		Vector3 newPositionBeforeCorrection = m_player->m_worldPosition + ( newRedirectedVelocity * deltaSeconds );
@@ -353,7 +377,7 @@ Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& veloci
 		}
 		else
 		{
-			hitSomething = /*BoxTraceWithAmanatidesWoo*/ BoxTraceWithTwelveRaygancasts( m_player->m_worldPosition, newPositionBeforeCorrection, /*PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT,*/ minHitResult );
+			hitSomething = BoxTraceWithAmanatidesWoo( m_player->m_worldPosition, newPositionBeforeCorrection, minHitResult );
 		}
 
 		if ( !hitSomething ) 
@@ -368,7 +392,7 @@ Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& veloci
 			return Vector3::ZERO; //e.g. penultimate and ultimate block hit were the same block.
 
 		//If we collided with a stairs slab, check for an existing block above and push upward, then re-run physics.
-		if ( !( directionOppositeCollidedBlock == WORLD_DOWN || directionOppositeCollidedBlock == WORLD_UP ) && minHitResult.lastBlockHit.GetBlock( )->GetBlockType( ) == STAIRS )
+		if ( !( ( directionOppositeCollidedBlock == WORLD_DOWN ) || ( directionOppositeCollidedBlock == WORLD_UP ) ) && ( minHitResult.lastBlockHit.GetBlock()->GetBlockType() == STAIRS ) )
 		{
 			BlockInfo blockAboveStairs = minHitResult.lastBlockHit;
 
@@ -378,22 +402,22 @@ Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& veloci
 			} 
 			while ( blockAboveStairs.GetBlock()->GetBlockType() == STAIRS );
 
-			if ( BlockDefinition::IsSolid( blockAboveStairs.GetBlock( )->GetBlockType( ) ) )
+			if ( BlockDefinition::IsSolid( blockAboveStairs.GetBlock()->GetBlockType() ) )
 				continue;
 
 			posToMove += STAIR_BOOST;
 		}
 
 		//Redirect prior iteration's velocity to slide by the % we moved when we had the collision into dimensions EXCEPTING the one the hit occurred in.
-		if ( directionOppositeCollidedBlock == WORLD_DOWN || directionOppositeCollidedBlock == WORLD_UP )
+		if ( ( directionOppositeCollidedBlock == WORLD_DOWN ) || ( directionOppositeCollidedBlock == WORLD_UP ) )
 		{
 			newRedirectedVelocity = Vector3( newRedirectedVelocity.x * redirectionScalar, newRedirectedVelocity.y * redirectionScalar, 0.f );
 		}
-		else if ( directionOppositeCollidedBlock == WORLD_LEFT || directionOppositeCollidedBlock == WORLD_RIGHT )
+		else if ( ( directionOppositeCollidedBlock == WORLD_LEFT ) || ( directionOppositeCollidedBlock == WORLD_RIGHT ) )
 		{
 			newRedirectedVelocity = Vector3( newRedirectedVelocity.x * redirectionScalar, 0.f, newRedirectedVelocity.z * redirectionScalar );
 		}
-		else if ( directionOppositeCollidedBlock == WORLD_FORWARD || directionOppositeCollidedBlock == WORLD_BACKWARD )
+		else if ( ( directionOppositeCollidedBlock == WORLD_FORWARD ) || ( directionOppositeCollidedBlock == WORLD_BACKWARD ) )
 		{
 			newRedirectedVelocity = Vector3( 0.f, newRedirectedVelocity.y * redirectionScalar, newRedirectedVelocity.z * redirectionScalar );
 		}
@@ -409,21 +433,21 @@ Vector3 World::GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& veloci
 
 
 //--------------------------------------------------------------------------------------------------------------
-BlockType World::GetBlockTypeFromWorldCoords( WorldCoords wc )
+BlockType World::GetBlockTypeFromWorldCoords( const WorldCoords& wc )
 {
 	BlockInfo blockForGivenPos = GetBlockInfoFromWorldCoords( wc );
-	if ( blockForGivenPos != BlockInfo( ) ) //e.g. before any chunks have loaded.
-	{
-		return blockForGivenPos.GetBlock( )->GetBlockType( );
-	}
-	else return NUM_BLOCK_TYPES;
+
+	if ( blockForGivenPos != BlockInfo() ) //e.g. this will hold before any chunks have loaded.
+		return blockForGivenPos.GetBlock()->GetBlockType();
+	else 
+		return NUM_BLOCK_TYPES;
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
 bool World::BoxTraceWithStepAndSample( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& minHitResult )
 {
-	RaycastResult3D hitResult;
+	RaycastResult3D hitResult; //Take the first raycast that hits something and use it to scale back the velocity vector preventively.
 	
 	//Top of player bounding box, front-left corner.
 	RaycastWithStepAndSample(
@@ -508,111 +532,117 @@ bool World::BoxTraceWithStepAndSample( const Vector3& rayStartPos, const Vector3
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
-	if ( minHitResult.impactFraction > .999f ) return false; //No collisions.
-	else return true;
+	if ( minHitResult.impactFraction > .999f ) //Afforded error tolerance at .001.
+		return false; //No collisions, move forward without scaling back player velocity vector.
+	else 
+		return true;
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-bool World::BoxTraceWithTwelveRaygancasts( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& minHitResult )
+bool World::BoxTraceWithAmanatidesWoo( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& minHitResult )
 {
-	RaycastResult3D hitResult;
+	RaycastResult3D hitResult; //Take the first raycast that hits something and use it to scale back the velocity vector preventively.
 
 	//Top of player bounding box, front-left corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ), hitResult );
 	minHitResult = hitResult;
 
 	//Top of player bounding box, front-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Top of player bounding box, back-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Top of player bounding box, back-left corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Middle of player bounding box, front-left corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Middle of player bounding box, front-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Middle of player bounding box, back-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Middle of player bounding box, back-left corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Bottom of player bounding box, front-left corner.`
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Bottom of player bounding box, front-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Bottom of player bounding box, back-right corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
 	//Bottom of player bounding box, back-left corner.
-	RaygancastWithAmanatidesWoo(
+	RaycastWithAmanatidesWoo(
 		rayStartPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ),
 		rayEndPos + Vector3( -PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, -PLAYER_HALF_HEIGHT ), hitResult );
 	if ( minHitResult.impactFraction > hitResult.impactFraction )
 		minHitResult = hitResult;
 
-	if ( minHitResult.impactFraction > .999f ) return false; //No collisions.
-	else return true;
+	if ( minHitResult.impactFraction > .999f ) //Afforded error tolerance at .001.
+		return false; //No collisions, move forward without scaling back player velocity vector.
+	else 
+		return true;
 }
 
 
-//---//Did not work: need to check 8 blocks around each new position, as the box can snag at any of its corners.
+//--------------------------------------------------------------------------------------------------------------
+//WARNING, Did not work: need to check 8 blocks around each new position, as the box can snag at any of its corners.
 bool World::BoxTraceWithAmanatidesWoo( Vector3 boxCenterStartPos, Vector3 boxCenterEndPos, float boxHalfLengthX, float boxHalfWidthY, float boxHalfHeightZ, RaycastResult3D& out_result )
-{//Regan-casting
+{
 	BlockInfo originBlockInfo = GetBlockInfoFromWorldCoords( boxCenterStartPos );
-	if ( originBlockInfo.m_myChunk == nullptr ) return false;
+	if ( originBlockInfo.m_myChunk == nullptr ) 
+		return false;
 
-	//Initialization of Regan-cast -- NEED TO TAKE THE MINS OF EACH OF THE 8 CORNERS OF OUR PLAYER, AS WE CAN OVERLAP UP TO 8 BLOCKS THAT MAY BE SOLID!
+	//Initialization of Raycast -- NEED TO TAKE THE MINS OF EACH OF THE 8 CORNERS OF OUR PLAYER, AS WE CAN OVERLAP UP TO 8 BLOCKS THAT MAY BE SOLID!
 	BlockInfo initialCheckingBlockInfo;
 	GlobalBlockCoords currentCheckingBlockPos;
 	for ( int initialCheckingBlockIndex = 0; initialCheckingBlockIndex < 8; initialCheckingBlockIndex++ )
@@ -712,11 +742,14 @@ bool World::BoxTraceWithAmanatidesWoo( Vector3 boxCenterStartPos, Vector3 boxCen
 		//if OnX is lowest
 		if ( ( tOfNextCrossingOnX < tOfNextCrossingOnY ) && ( tOfNextCrossingOnX < tOfNextCrossingOnZ ) )
 		{
-			if ( tOfNextCrossingOnX > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnX > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 
 			blockPos.x += tileStepX; //move into next tile on x
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr ) 
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -734,11 +767,14 @@ bool World::BoxTraceWithAmanatidesWoo( Vector3 boxCenterStartPos, Vector3 boxCen
 		//if OnY is lowest
 		else if ( ( tOfNextCrossingOnY < tOfNextCrossingOnX ) && ( tOfNextCrossingOnY < tOfNextCrossingOnZ ) )
 		{
-			if ( tOfNextCrossingOnY > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnY > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 
 			blockPos.y += tileStepY; //move into next tile on y
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr )
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -756,11 +792,14 @@ bool World::BoxTraceWithAmanatidesWoo( Vector3 boxCenterStartPos, Vector3 boxCen
 		// tOfNextCrossingOnZ is lowest
 		else
 		{
-			if ( tOfNextCrossingOnZ > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnZ > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 
 			blockPos.z += tileStepZ; //move into next tile on z
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr ) 
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -793,10 +832,13 @@ void World::UpdateMouseAndCameraOffset( Vector3& cameraPos, Vector3& playerPos, 
 	//Push camera to correct offset relative to player based on movement mode.
 	if ( g_theInput->WasKeyPressedOnce( KEY_TO_TOGGLE_CAMERA ) ) g_currentCameraMode = (CameraMode)WrapNumberWithinCircularRange( g_currentCameraMode + 1, 0, NUM_CAMERA_MODES );
 
+	constexpr float FIXED_SPECTATOR_ARM_DISTANCE = 10.f;
+	const Vector3 FIXED_SPECTATOR_ARM_DISPLACEMENT = Vector3( FIXED_SPECTATOR_ARM_DISTANCE, FIXED_SPECTATOR_ARM_DISTANCE, FIXED_SPECTATOR_ARM_DISTANCE );
+
 	switch ( g_currentCameraMode )
 	{
 		case FIRST_PERSON: cameraPos = playerPos + Vector3( 0.f, 0.f, PLAYER_HEIGHT - CAMERA_FIRST_PERSON_HEIGHT ); break;
-		case FIXED_SPECTATOR: cameraPos = playerPos + Vector3( 10.f, 10.f, 10.f ); break;
+		case FIXED_SPECTATOR: cameraPos = playerPos + FIXED_SPECTATOR_ARM_DISPLACEMENT; break;
 		case FROM_BEHIND: cameraPos = playerPos + ( -camDirection * CAMERA_FROM_BEHIND_PUSHBACK_LENGTH ); break;
 	}
 }
@@ -805,14 +847,15 @@ void World::UpdateMouseAndCameraOffset( Vector3& cameraPos, Vector3& playerPos, 
 //--------------------------------------------------------------------------------------------------------------
 void World::DeactivateFarthestObsoleteChunk()
 {
-	if ( m_activeChunks[ m_activeDimension ].size() <= 0 ) return;
+	std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	if ( activeChunksInActiveDimension.size() <= 0 )
+		return;
 
 	//Find chunk.
-	auto chunkIterEnd = m_activeChunks[ m_activeDimension ].end( );
 	Chunk* farthestObsoleteChunk = nullptr;
-	for ( auto chunkIter = m_activeChunks[ m_activeDimension ].begin( ); chunkIter != chunkIterEnd; ++chunkIter )
+	for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 	{
-		Chunk* currentChunk = chunkIter->second;
+		Chunk* currentChunk = activeChunkPair.second;
 		if ( IsChunkBeyondFlushRadius( currentChunk ) ) //Even if true, another chunk may be farther away.
 		{
 			if ( farthestObsoleteChunk == nullptr )
@@ -821,17 +864,18 @@ void World::DeactivateFarthestObsoleteChunk()
 			}
 			else
 			{
-				farthestObsoleteChunk =	GetChunkFartherFromPlayer( farthestObsoleteChunk, currentChunk );
+				farthestObsoleteChunk = GetChunkFartherFromPlayer( farthestObsoleteChunk, currentChunk );
 			}
 		}
 	}
 
-	if ( farthestObsoleteChunk != nullptr ) FlushChunk( farthestObsoleteChunk );
+	if ( farthestObsoleteChunk != nullptr )
+		FlushChunk( farthestObsoleteChunk );
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
-void World::ActivateNearestMissingChunk() //TODO: amortize over all dimensions.
+void World::ActivateNearestMissingChunk() //Possible future optimization: amortize over all dimensions. Currently unnecessary.
 {
 	//Loop around the player position +- active radius.
 	WorldCoords playerPos = m_playerCamera->m_worldPosition;
@@ -842,43 +886,17 @@ void World::ActivateNearestMissingChunk() //TODO: amortize over all dimensions.
 	WorldCoordsXY closestUnloadedChunkInWorldPos;
 	bool foundCandidate = false;
 
-
-	//For some reason this below loop actually causes the game to run slower than the older hackier loop below? Maybe exits less?
-// 	for ( float y = searchMins.y; y <= searchMaxs.y; y += 1.0f )
-// 	{
-// 		for ( float x = searchMins.x; x <= searchMaxs.x; x += 1.0f )
-// 		{
-// 			//Candidacy check--even if true, another chunk may be closer.
-// 			currentChunkInWorldPos = WorldCoordsXY( x, y );
-// 			ChunkCoords asCC = GetChunkCoordsFromWorldCoordsXY( currentChunkInWorldPos );
-// 
-// 			if ( m_activeChunks[ m_activeDimension ].count( asCC ) == 0 && IsChunkWithinActiveRadius( currentChunkInWorldPos ) )
-// 			{
-// 				if ( foundCandidate == false )
-// 					closestUnloadedChunkInWorldPos = currentChunkInWorldPos;
-// 				else
-// 					closestUnloadedChunkInWorldPos = GetChunkPosNearerToPlayer( closestUnloadedChunkInWorldPos, currentChunkInWorldPos );
-// 
-// 				foundCandidate = true;
-// 			}
-// 		}
-// 	}
-
-	//Old hacky loop.
 	int searchDiameter = 2 * m_activeRadius;
 	int numChunksSearched = (searchDiameter * searchDiameter) / NUM_COLUMNS_PER_CHUNK; //Square search.
-	for ( int chunkIndex = 0; chunkIndex < numChunksSearched; chunkIndex++ ) //TODO: Just change to a 2D loop on chunkSearchMaxX, maxY!
+	for ( int chunkIndex = 0; chunkIndex < numChunksSearched; chunkIndex++ ) //Future optimization: Just change to a 2D loop on chunkSearchMaxX, maxY!
 	{
 		//Candidacy check--even if true, another chunk may be closer.
 		ChunkCoords asCC = GetChunkCoordsFromWorldCoordsXY( currentChunkInWorldPos );
 
 		if ( m_activeChunks[ m_activeDimension ].count( asCC ) == 0 && IsChunkWithinActiveRadius( currentChunkInWorldPos ) )
 		{
-			if ( foundCandidate == false )
-				closestUnloadedChunkInWorldPos = currentChunkInWorldPos;
-			else
-				closestUnloadedChunkInWorldPos = GetChunkPosNearerToPlayer( closestUnloadedChunkInWorldPos, currentChunkInWorldPos );
-
+			closestUnloadedChunkInWorldPos = ( foundCandidate ? GetChunkPosNearerToPlayer( closestUnloadedChunkInWorldPos, currentChunkInWorldPos ) 
+															  : currentChunkInWorldPos );
 			foundCandidate = true;
 		}
 
@@ -891,21 +909,24 @@ void World::ActivateNearestMissingChunk() //TODO: amortize over all dimensions.
 		}
 	}
 
-	if ( foundCandidate ) CreateOrLoadChunk( GetChunkCoordsFromWorldCoordsXY ( closestUnloadedChunkInWorldPos ) );
+	if ( foundCandidate )
+	{
+		const ChunkCoords& candidateChunkPos = GetChunkCoordsFromWorldCoordsXY( closestUnloadedChunkInWorldPos );
+		CreateOrLoadChunk( candidateChunkPos );
+	}
 }
 
 
 //--------------------------------------------------------------------------------------------------------------
 void World::UpdateDirtyVertexArrays()
 {
-	auto chunkIterEnd = m_activeChunks[ m_activeDimension ].end( );
-	for ( auto chunkIter = m_activeChunks[ m_activeDimension ].begin( ); chunkIter != chunkIterEnd; ++chunkIter )
+	const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 	{
-		Chunk* currentChunk = chunkIter->second;
+		Chunk* currentChunk = activeChunkPair.second;
+
 		if ( currentChunk->IsDirty() )
-		{
 			currentChunk->RebuildVertexArray();
-		}
 	}
 }
 
@@ -919,8 +940,7 @@ bool World::IsChunkBeyondFlushRadius( const Chunk* currentChunk ) const
 	Vector2 playerChunkDisplacement = playerPos - chunkPos;
 	float playerChunkDistance = playerChunkDisplacement.CalcLength( );
 
-	if ( playerChunkDistance > m_flushRadius ) return true;
-	else return false;
+	return ( playerChunkDistance > m_flushRadius );
 }
 
 
@@ -933,8 +953,7 @@ bool World::IsChunkWithinActiveRadius( const WorldCoordsXY& chunkPos ) const
 	float playerChunkDistance = playerChunkDisplacement.CalcLength( );
 
 	//Radii are in world units.
-	if ( playerChunkDistance <= m_activeRadius ) return true;
-	else return false;
+	return ( playerChunkDistance <= m_activeRadius );
 }
 
 
@@ -944,7 +963,7 @@ Chunk* World::GetChunkFartherFromPlayer( Chunk* chunk1, Chunk* chunk2 ) const
 	WorldCoordsXY playerPos = WorldCoordsXY( m_playerCamera->m_worldPosition.x, m_playerCamera->m_worldPosition.y );
 
 	WorldCoordsXY firstChunkPos = chunk1->GetChunkMinsInWorldUnits();
-	WorldCoordsXY secondChunkPos = chunk2->GetChunkMinsInWorldUnits( );
+	WorldCoordsXY secondChunkPos = chunk2->GetChunkMinsInWorldUnits();
 
 	Vector2 firstChunkDisplacement = playerPos - firstChunkPos;
 	float firstChunkDistance = firstChunkDisplacement.CalcLength();
@@ -952,8 +971,7 @@ Chunk* World::GetChunkFartherFromPlayer( Chunk* chunk1, Chunk* chunk2 ) const
 	Vector2 secondChunkDisplacement = playerPos - secondChunkPos;
 	float secondChunkDistance = secondChunkDisplacement.CalcLength();
 
-	if ( firstChunkDistance >= secondChunkDistance ) return chunk1;
-	else return chunk2;
+	return ( firstChunkDistance >= secondChunkDistance ) ? chunk1 : chunk2;
 }
 
 
@@ -968,8 +986,7 @@ WorldCoordsXY World::GetChunkPosNearerToPlayer( const WorldCoordsXY& chunkPos1, 
 	Vector2 secondChunkDisplacement = playerPos - chunkPos2;
 	float secondChunkDistance = secondChunkDisplacement.CalcLength();
 
-	if ( firstChunkDistance <= secondChunkDistance ) return chunkPos1;
-	else return chunkPos2;
+	return ( firstChunkDistance <= secondChunkDistance ) ? chunkPos1 : chunkPos2;
 }
 
 
@@ -997,15 +1014,16 @@ void World::FlushChunk( Chunk* obsoleteChunk )
 //--------------------------------------------------------------------------------------------------------------
 void World::SaveAndExitWorld()
 {
-	if ( g_disableSaving ) return;
+	if ( g_disableSaving ) 
+		return;
 
 	for ( int dimensionIndex = 0; dimensionIndex < NUM_DIMENSIONS; dimensionIndex++ )
 	{
-		auto chunkIterEnd = m_activeChunks[ dimensionIndex ].end();
 		std::vector< unsigned char > rleBuffer;
-		for ( auto chunkIter = m_activeChunks[ dimensionIndex ].begin(); chunkIter != chunkIterEnd; ++chunkIter )
+		const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ dimensionIndex ];
+		for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 		{
-			Chunk* currentChunk = chunkIter->second;
+			Chunk* currentChunk = activeChunkPair.second;
 			ChunkCoords currentChunkPos = currentChunk->GetChunkCoords();
 			rleBuffer.clear();
 			currentChunk->GetRleString( rleBuffer );
@@ -1032,7 +1050,8 @@ void World::LoadPlayerFile( const std::string& filePath )
 {
 	std::vector< float > playerDataBuffer;
 	bool success = LoadFloatsFromTextFileIntoBuffer( filePath, playerDataBuffer );
-	if ( !success ) return; //Will use defaults from TheGame ctor.
+	if ( !success ) 
+		return; //Will use defaults from TheGame ctor.
 
 	//Hardcoding decoding based on SaveAndExitWorld():
 	m_playerCamera->m_worldPosition.x = playerDataBuffer[ 0 ];
@@ -1088,10 +1107,11 @@ void World::UpdateNeighborPointers( Chunk* newChunk )
 	ChunkCoords tmpCoords = ChunkCoords( newChunkPos.x + 1, newChunkPos.y );
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		newChunk->m_northNeighbor = activeChunksInActiveDimension[ tmpCoords ];
-		activeChunksInActiveDimension[ tmpCoords ]->m_southNeighbor = newChunk;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
-		MarkChunkLightingDirty( activeChunksInActiveDimension[ tmpCoords ] );
+		Chunk* neighborOfNewChunk = activeChunksInActiveDimension[ tmpCoords ];
+		newChunk->m_northNeighbor = neighborOfNewChunk;
+		neighborOfNewChunk->m_southNeighbor = newChunk;
+		neighborOfNewChunk->MarkVertexArrayDirty();
+		MarkChunkLightingDirty( neighborOfNewChunk );
 	}
 	else newChunk->m_northNeighbor = nullptr;
 
@@ -1099,10 +1119,11 @@ void World::UpdateNeighborPointers( Chunk* newChunk )
 	tmpCoords.x -= 2;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		newChunk->m_southNeighbor = activeChunksInActiveDimension[ tmpCoords ];
-		activeChunksInActiveDimension[ tmpCoords ]->m_northNeighbor = newChunk;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
-		MarkChunkLightingDirty( activeChunksInActiveDimension[ tmpCoords ] );
+		Chunk* neighborOfNewChunk = activeChunksInActiveDimension[ tmpCoords ];
+		newChunk->m_southNeighbor = neighborOfNewChunk;
+		neighborOfNewChunk->m_northNeighbor = newChunk;
+		neighborOfNewChunk->MarkVertexArrayDirty();
+		MarkChunkLightingDirty( neighborOfNewChunk );
 	}
 	else newChunk->m_southNeighbor = nullptr;
 
@@ -1111,10 +1132,11 @@ void World::UpdateNeighborPointers( Chunk* newChunk )
 	tmpCoords.y++;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		newChunk->m_westNeighbor = activeChunksInActiveDimension[ tmpCoords ];
-		activeChunksInActiveDimension[ tmpCoords ]->m_eastNeighbor = newChunk;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
-		MarkChunkLightingDirty( activeChunksInActiveDimension[ tmpCoords ] );
+		Chunk* neighborOfNewChunk = activeChunksInActiveDimension[ tmpCoords ];
+		newChunk->m_westNeighbor = neighborOfNewChunk;
+		neighborOfNewChunk->m_eastNeighbor = newChunk;
+		neighborOfNewChunk->MarkVertexArrayDirty( );
+		MarkChunkLightingDirty( neighborOfNewChunk );
 	}
 	else newChunk->m_westNeighbor = nullptr;
 
@@ -1122,10 +1144,11 @@ void World::UpdateNeighborPointers( Chunk* newChunk )
 	tmpCoords.y -= 2;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		newChunk->m_eastNeighbor = activeChunksInActiveDimension[ tmpCoords ];
-		activeChunksInActiveDimension[ tmpCoords ]->m_westNeighbor = newChunk;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
-		MarkChunkLightingDirty( activeChunksInActiveDimension[ tmpCoords ] );
+		Chunk* neighborOfNewChunk = activeChunksInActiveDimension[ tmpCoords ];
+		newChunk->m_eastNeighbor = neighborOfNewChunk;
+		neighborOfNewChunk->m_westNeighbor = newChunk;
+		neighborOfNewChunk->MarkVertexArrayDirty();
+		MarkChunkLightingDirty( neighborOfNewChunk );
 	}
 	else newChunk->m_eastNeighbor = nullptr;
 }
@@ -1141,16 +1164,18 @@ void World::NullifyNeighborPointers( Chunk* obsoleteChunk )
 	ChunkCoords tmpCoords = ChunkCoords( obsoleteChunkPos.x + 1, obsoleteChunkPos.y );
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		activeChunksInActiveDimension[ tmpCoords ]->m_southNeighbor = nullptr;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
+		Chunk* obsoleteChunkNeighbor = activeChunksInActiveDimension[ tmpCoords ];
+		obsoleteChunkNeighbor->m_southNeighbor = nullptr;
+		obsoleteChunkNeighbor->MarkVertexArrayDirty();
 	}
 
 	//South.
 	tmpCoords.x -= 2;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		activeChunksInActiveDimension[ tmpCoords ]->m_northNeighbor = nullptr;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
+		Chunk* obsoleteChunkNeighbor = activeChunksInActiveDimension[ tmpCoords ];
+		obsoleteChunkNeighbor->m_northNeighbor = nullptr;
+		obsoleteChunkNeighbor->MarkVertexArrayDirty();
 	}
 
 	//West.
@@ -1158,16 +1183,18 @@ void World::NullifyNeighborPointers( Chunk* obsoleteChunk )
 	tmpCoords.y++;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		activeChunksInActiveDimension[ tmpCoords ]->m_eastNeighbor = nullptr;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
+		Chunk* obsoleteChunkNeighbor = activeChunksInActiveDimension[ tmpCoords ];
+		obsoleteChunkNeighbor->m_eastNeighbor = nullptr;
+		obsoleteChunkNeighbor->MarkVertexArrayDirty();
 	}
 
 	//East.
 	tmpCoords.y -= 2;
 	if ( activeChunksInActiveDimension.count( tmpCoords ) != 0 )
 	{
-		activeChunksInActiveDimension[ tmpCoords ]->m_westNeighbor = nullptr;
-		activeChunksInActiveDimension[ tmpCoords ]->MarkVertexArrayDirty( );
+		Chunk* obsoleteChunkNeighbor = activeChunksInActiveDimension[ tmpCoords ];
+		obsoleteChunkNeighbor->m_westNeighbor = nullptr;
+		obsoleteChunkNeighbor->MarkVertexArrayDirty();
 	}
 }
 
@@ -1178,8 +1205,11 @@ void World::SelectBlock( const WorldCoords& selectorsPos, const WorldCoords& end
 	RaycastResult3D hitResult;
 	bool hitSomething = false;
 
-	if ( !g_useAmanWooRaycastOverStepAndSample ) hitSomething = RaycastWithStepAndSample( selectorsPos, endOfSelectionRay, hitResult );
-	else hitSomething = RaygancastWithAmanatidesWoo( selectorsPos, endOfSelectionRay, hitResult );
+	if ( !g_useAmanWooRaycastOverStepAndSample ) 
+		hitSomething = RaycastWithStepAndSample( selectorsPos, endOfSelectionRay, hitResult );
+	else 
+		hitSomething = RaycastWithAmanatidesWoo( selectorsPos, endOfSelectionRay, hitResult );
+
 	if ( !hitSomething )
 	{
 		m_chunkOfSelectedBlock = nullptr;
@@ -1252,8 +1282,6 @@ void World::SelectBlock( const WorldCoords& selectorsPos, const WorldCoords& end
 			&blockPlacedInto );
 		UpdateLightingForBlockPlaced( blockPlacedInto );
 	}
-
-	return;
 }
 
 
@@ -1284,7 +1312,8 @@ bool World::RaycastWithStepAndSample( const WorldCoords& selectorsPos, const Wor
 		currentPos += stepAlongDisplacement;
 
 		currentBlockInfo = GetBlockInfoFromWorldCoords( currentPos );
-		if ( currentBlockInfo.m_myChunk == nullptr ) return false; //Ray shot outside loaded chunks.
+		if ( currentBlockInfo.m_myChunk == nullptr ) 
+			return false; //Ray shot outside loaded chunks.
 
 		if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) )
 		{
@@ -1306,11 +1335,12 @@ bool World::RaycastWithStepAndSample( const WorldCoords& selectorsPos, const Wor
 
 
 //--------------------------------------------------------------------------------------------------------------
-bool World::RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, RaycastResult3D& out_result )
+bool World::RaycastWithAmanatidesWoo( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, RaycastResult3D& out_result )
 {
 	//Regan-casting
 	BlockInfo originBlockInfo = GetBlockInfoFromWorldCoords( selectorsPos );
-	if ( originBlockInfo.m_myChunk == nullptr ) return false;
+	if ( originBlockInfo.m_myChunk == nullptr ) 
+		return false;
 
 	//Initialization of Regan-cast
 	GlobalBlockCoords blockPos = GlobalBlockCoords(
@@ -1364,11 +1394,14 @@ bool World::RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const 
 		//if OnX is lowest
 		if ( ( tOfNextCrossingOnX < tOfNextCrossingOnY ) && ( tOfNextCrossingOnX < tOfNextCrossingOnZ ) )
 		{
-			if ( tOfNextCrossingOnX > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnX > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 		
 			blockPos.x += tileStepX; //move into next tile on x
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr ) 
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -1386,11 +1419,14 @@ bool World::RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const 
 		//if OnY is lowest
 		else if ( ( tOfNextCrossingOnY < tOfNextCrossingOnX ) && ( tOfNextCrossingOnY < tOfNextCrossingOnZ ) )
 		{
-			if ( tOfNextCrossingOnY > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnY > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 
 			blockPos.y += tileStepY; //move into next tile on y
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr ) 
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -1408,11 +1444,14 @@ bool World::RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const 
 		// tOfNextCrossingOnZ is lowest
 		else 
 		{
-			if ( tOfNextCrossingOnZ > 1 ) return false; //No impact, i.e. next crossing past endpoint.
+			if ( tOfNextCrossingOnZ > 1 ) 
+				return false; //No impact, i.e. next crossing past endpoint.
 
 			blockPos.z += tileStepZ; //move into next tile on z
 			currentBlockInfo = GetBlockInfoFromGlobalBlockCoords( blockPos );
-			if ( currentBlockInfo.m_myChunk == nullptr ) return false;
+			if ( currentBlockInfo.m_myChunk == nullptr ) 
+				return false;
+
 			if ( currentBlockInfo.m_myChunk->IsBlockSolid( currentBlockInfo.m_myBlockIndex ) ) //Impact.
 			{
 				out_result.lastBlockHit = currentBlockInfo;
@@ -1437,13 +1476,20 @@ bool World::RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const 
 //--------------------------------------------------------------------------------------------------------------
 Vector3 World::FindDirectionBetweenBlocks( BlockInfo lastBlockHit, BlockInfo hitBlockInfo )
 {
-	if ( lastBlockHit.m_myChunk == nullptr ) return Vector3::ZERO;
+	if ( lastBlockHit.m_myChunk == nullptr ) 
+		return Vector3::ZERO;
 
 	BlockInfo steppingBlock = lastBlockHit;
-	if ( hitBlockInfo.m_myBlockIndex < 0 || hitBlockInfo.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) return Vector3::ZERO;
-	if ( steppingBlock.m_myBlockIndex < 0 || steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) return Vector3::ZERO;
+	if ( ( hitBlockInfo.m_myBlockIndex < 0 ) || ( hitBlockInfo.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) )
+		return Vector3::ZERO;
+
+	if ( ( steppingBlock.m_myBlockIndex < 0 ) || ( steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) ) 
+		return Vector3::ZERO;
+
 	steppingBlock.StepDown();
-	if ( steppingBlock.m_myBlockIndex < 0 || steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) return Vector3::ZERO;
+	if ( ( steppingBlock.m_myBlockIndex < 0 ) || ( steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) )
+		return Vector3::ZERO;
+
 	LocalBlockCoords steppingBlockCoords = GetLocalBlockCoordsFromLocalBlockIndex( steppingBlock.m_myBlockIndex );
 	LocalBlockCoords hitBlockCoords = GetLocalBlockCoordsFromLocalBlockIndex( hitBlockInfo.m_myBlockIndex );
 	if ( steppingBlockCoords.z == hitBlockCoords.z )
@@ -1451,7 +1497,9 @@ Vector3 World::FindDirectionBetweenBlocks( BlockInfo lastBlockHit, BlockInfo hit
 
 	steppingBlock = lastBlockHit;
 	steppingBlock.StepUp();
-	if ( steppingBlock.m_myBlockIndex < 0 || steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) return Vector3::ZERO;
+	if ( ( steppingBlock.m_myBlockIndex < 0 ) || ( steppingBlock.m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) ) 
+		return Vector3::ZERO;
+
 	steppingBlockCoords = GetLocalBlockCoordsFromLocalBlockIndex( steppingBlock.m_myBlockIndex );
 	if ( steppingBlockCoords.z == hitBlockCoords.z )
 		return WORLD_UP;
@@ -1487,10 +1535,10 @@ Vector3 World::FindDirectionBetweenBlocks( BlockInfo lastBlockHit, BlockInfo hit
 //--------------------------------------------------------------------------------------------------------------
 void World::UnhighlightSelectedBlock()
 {
-	auto chunkIterEnd = m_activeChunks[ m_activeDimension ].end();
-	for ( auto chunkIter = m_activeChunks[ m_activeDimension ].begin( ); chunkIter != chunkIterEnd; ++chunkIter )
+	const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 	{
-		Chunk* currentChunk = chunkIter->second;
+		Chunk* currentChunk = activeChunkPair.second;
 		if ( currentChunk->IsHighlighting() )
 			currentChunk->Unhighlight();
 	}
@@ -1503,10 +1551,12 @@ BlockInfo World::GetBlockInfoFromWorldCoords( const WorldCoords& wc )
 	WorldCoordsXY wc2D = WorldCoordsXY( wc.x, wc.y );
 	ChunkCoords chunkCoordsOfCurrentPos = GetChunkCoordsFromWorldCoordsXY( wc2D );
 
-	if ( m_activeChunks[ m_activeDimension ].count( chunkCoordsOfCurrentPos ) == 0 ) 
+
+	const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	if ( activeChunksInActiveDimension.count( chunkCoordsOfCurrentPos ) == 0 ) 
 		return BlockInfo(); //WorldCoords outside loaded chunks.
 
-	Chunk* currentChunk = m_activeChunks[ m_activeDimension ][ chunkCoordsOfCurrentPos ];
+	Chunk* currentChunk = activeChunksInActiveDimension.at( chunkCoordsOfCurrentPos );
 	WorldCoordsXY currentChunkCoordsInWorldUnits = currentChunk->GetChunkMinsInWorldUnits(); //e.g. (1,0) becomes (16.f,0.f).
 
 	LocalBlockCoords lbc;
@@ -1558,13 +1608,15 @@ void World::InitializeLightingForChunk( Chunk* newChunk )
 			LocalBlockCoords lbc = IntVector3( lcc.x, lcc.y, blockHeight );
 
 			Block* currentBlock = newChunk->GetBlockFromLocalBlockCoords( lbc );
-			if ( currentBlock == nullptr ) return;
+			if ( currentBlock == nullptr ) 
+				return;
 
-			if ( currentBlock->IsOpaque( ) ) break; //Stop descent, no more sky blocks, nor is this one.
+			if ( currentBlock->IsOpaque( ) ) 
+				break; //Stop descent, no more sky blocks, nor is this one.
 
 			currentBlock->SetBlockToBeSky( );
 			currentBlock->SetLightLevel( MAX_LIGHTING_LEVEL );
-			if ( g_renderSkyBlocksAsDebugPoints && blockHeight < 68 )
+			if ( g_renderSkyBlocksAsDebugPoints && ( blockHeight < ( SEA_LEVEL_HEIGHT_LIMIT + 4 ) ) ) //Adjust height as desired for debug tests.
 			{
 				AddDebugPoint
 				(
@@ -1585,9 +1637,11 @@ void World::InitializeLightingForChunk( Chunk* newChunk )
 			LocalBlockIndex lbi = GetLocalBlockIndexFromLocalBlockCoords( lbc );
 
 			Block* currentBlock = newChunk->GetBlockFromLocalBlockIndex( lbi );
-			if ( currentBlock == nullptr ) return;
+			if ( currentBlock == nullptr ) 
+				return;
 
-			if ( currentBlock->IsOpaque() ) break; //Stop descent, no more sky blocks, nor is this one.
+			if ( currentBlock->IsOpaque() ) 
+				break; //Stop descent, no more sky blocks, nor is this one.
 
 			BlockInfo currentBlockInfo = BlockInfo( newChunk, lbi );
 			DirtyNonSkyNeighborsForBlock( currentBlockInfo, false );
@@ -1598,12 +1652,14 @@ void World::InitializeLightingForChunk( Chunk* newChunk )
 	for ( int blockIndex = 0; blockIndex < NUM_BLOCKS_PER_CHUNK; blockIndex++ )
 	{
 		Block* currentBlock = newChunk->GetBlockFromLocalBlockIndex( blockIndex );
-		if ( currentBlock == nullptr ) continue;
+		if ( currentBlock == nullptr ) 
+			continue;
 
-		if ( !currentBlock->IsSky() && ( BlockDefinition::GetLightLevel( currentBlock->GetBlockType() ) > 0 ) )
-		{
+		int lightLevelForBlockType = BlockDefinition::GetLightLevel( currentBlock->GetBlockType() );
+		bool isLightSource = ( lightLevelForBlockType > 0 );
+
+		if ( !currentBlock->IsSky() && isLightSource )
 			MarkBlockLightingDirty( BlockInfo( newChunk, blockIndex ) );
-		}
 	}
 }
 
@@ -1617,12 +1673,15 @@ void World::UpdateLighting()
 		m_dirtyBlocks.pop_front();
 		
 		Block* currentBlock = bi.GetBlock();
-		if ( currentBlock == nullptr ) continue;
+		if ( currentBlock == nullptr ) 
+			continue;
+
 		currentBlock->SetLightingNotDirty();
 		
 		int idealLight = GetIdealLightForBlock( bi );
 		int currentLight = currentBlock->GetLightLevel();
-		if ( idealLight == currentLight ) continue; //Already correct, implying neighbors don't need dirtying.
+		if ( idealLight == currentLight ) 
+			continue; //Already correct, implying neighbors don't need dirtying.
 
 		currentBlock->SetLightLevel( idealLight );
 		DirtyNonSkyNeighborsForBlock( bi );
@@ -1638,29 +1697,35 @@ void World::DirtyNonSkyNeighborsForBlock( BlockInfo& bi, bool includeVerticalNei
 
 	neighbor = bi;
 	neighbor.StepEast();
-	if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+	if ( !neighbor.GetBlock()->IsSky() ) 
+		MarkBlockLightingDirty( neighbor );
 
 	neighbor = bi;
 	neighbor.StepWest();
-	if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+	if ( !neighbor.GetBlock()->IsSky() ) 
+		MarkBlockLightingDirty( neighbor );
 
 	neighbor = bi;
 	neighbor.StepNorth();
-	if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+	if ( !neighbor.GetBlock()->IsSky() ) 
+		MarkBlockLightingDirty( neighbor );
 
 	neighbor = bi;
 	neighbor.StepSouth();
-	if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+	if ( !neighbor.GetBlock()->IsSky() ) 
+		MarkBlockLightingDirty( neighbor );
 
 	if ( includeVerticalNeighbors )
 	{
 		neighbor = bi;
 		neighbor.StepUp();
-		if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+		if ( !neighbor.GetBlock()->IsSky() ) 
+			MarkBlockLightingDirty( neighbor );
 
 		neighbor = bi;
 		neighbor.StepDown();
-		if ( !neighbor.GetBlock()->IsSky() ) MarkBlockLightingDirty( neighbor );
+		if ( !neighbor.GetBlock()->IsSky() ) 
+			MarkBlockLightingDirty( neighbor );
 	}
 }
 
@@ -1669,11 +1734,13 @@ void World::DirtyNonSkyNeighborsForBlock( BlockInfo& bi, bool includeVerticalNei
 int World::GetIdealLightForBlock( BlockInfo& bi )
 {
 	Block* block = bi.GetBlock();
-	if ( block == nullptr ) ERROR_AND_DIE( "Can't GetIdealLightFor Nullptr Block" );
+	if ( block == nullptr ) 
+		ERROR_AND_DIE( "Can't GetIdealLightFor Nullptr Block" );
 
 	//Easy-out for opaque blocks, else neighbors lift them to nonzero values.
 	BlockType currentBlockType = block->GetBlockType();
-	if ( BlockDefinition::IsOpaque( currentBlockType ) ) return BlockDefinition::GetLightLevel( currentBlockType );
+	if ( BlockDefinition::IsOpaque( currentBlockType ) ) 
+		return BlockDefinition::GetLightLevel( currentBlockType );
 
 	//"Light-deciding Committee"
 	int currentBlockLight = BlockDefinition::GetLightLevel( block->GetBlockType() ); //Need to add glowstone.
@@ -1715,11 +1782,10 @@ void World::UpdateChunks()
 {
 	int chunkLightLevel = ( g_useNightLightLevel ? NIGHT_LIGHTING_LEVEL : MAX_LIGHTING_LEVEL ); //Currently just a constant.
 	
-	auto chunkIterEnd = m_activeChunks[ m_activeDimension ].end();
-	for ( auto chunkIter = m_activeChunks[ m_activeDimension ].begin(); chunkIter != chunkIterEnd; ++chunkIter )
+	const std::map< ChunkCoords, Chunk* >& activeChunksInActiveDimension = m_activeChunks[ m_activeDimension ];
+	for ( const std::pair< ChunkCoords, Chunk* >& activeChunkPair : activeChunksInActiveDimension )
 	{
-		Chunk* currentChunk = chunkIter->second;
-
+		Chunk* currentChunk = activeChunkPair.second;
 		if ( currentChunk->GetCurrentSkyLightLevel() != chunkLightLevel )
 		{
 			currentChunk->SetCurrentSkyLightLevel( chunkLightLevel );
@@ -1737,7 +1803,8 @@ void World::UpdateLightingForBlockPlaced( BlockInfo blockPlacedInto )
 
 
 	Block* currentBlock = blockPlacedInto.GetBlock( );
-	if ( currentBlock == nullptr ) return;
+	if ( currentBlock == nullptr ) 
+		return;
 
 	if ( currentBlock->IsSky( ) ) //If so, need to dim things below it.
 	{
@@ -1749,7 +1816,8 @@ void World::UpdateLightingForBlockPlaced( BlockInfo blockPlacedInto )
 
 			blockPlacedInto.StepDown();
 			currentBlock = blockPlacedInto.GetBlock();
-			if ( currentBlock == nullptr ) break;
+			if ( currentBlock == nullptr ) 
+				break;
 
 		} while ( !currentBlock->IsOpaque() ); //What if it's air all the way down?
 
@@ -1768,7 +1836,8 @@ void World::UpdateLightingForBlockBroken( BlockInfo blockBroken )
 
 	blockBroken.StepUp();
 	Block* blockAboveBrokenBlock = blockBroken.GetBlock();
-	if ( blockAboveBrokenBlock == nullptr ) return;
+	if ( blockAboveBrokenBlock == nullptr ) 
+		return;
 
 	if ( blockAboveBrokenBlock->IsSky( ) )
 	{
@@ -1779,7 +1848,8 @@ void World::UpdateLightingForBlockBroken( BlockInfo blockBroken )
 		while ( !currentBlock->IsOpaque() )
 		{
 			currentBlock = blockBroken.GetBlock();
-			if ( currentBlock == nullptr ) break;
+			if ( currentBlock == nullptr ) 
+				break;
 
 			currentBlock->SetBlockToBeSky();
 			MarkBlockLightingDirty( blockBroken );
@@ -1805,8 +1875,12 @@ void World::MarkChunkLightingDirty( Chunk* chunk )
 //--------------------------------------------------------------------------------------------------------------
 bool World::IsBlockDugEnoughToBreak( BlockInfo block )
 {
-	if ( g_currentMovementMode == NOCLIP ) return true;
-	return m_player->GetSecondsSpentDigging() > BlockDefinition::GetSecondsToBreak( block.GetBlock()->GetBlockType() );
+	if ( g_currentMovementMode == NOCLIP ) 
+		return true;
+
+	float secondsSpentDiggingSoFar = m_player->GetSecondsSpentDigging();
+	float secondsToBreakTargetBlock = BlockDefinition::GetSecondsToBreak( block.GetBlock()->GetBlockType() );
+	return ( secondsSpentDiggingSoFar > secondsToBreakTargetBlock );
 }
 
 
@@ -1824,13 +1898,18 @@ bool World::IsPlayerOnGround()
 	BlockInfo biForFrontLeftCorner = GetBlockInfoFromWorldCoords( playerFeetPos + WorldCoords( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ) );
 	BlockInfo biForFrontRightCorner = GetBlockInfoFromWorldCoords( playerFeetPos + WorldCoords( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ) );
 	
-	if ( !( biForBackLeftCorner.StepDown( ) && biForBackRightCorner.StepDown( ) && biForFrontLeftCorner.StepDown( ) && biForFrontRightCorner.StepDown( ) ) ) return false; //Move failed.
+	if ( !( biForBackLeftCorner.StepDown( ) && biForBackRightCorner.StepDown( ) && biForFrontLeftCorner.StepDown( ) && biForFrontRightCorner.StepDown( ) ) ) 
+		return false; //Move failed.
 
 	//Want to be able to jump even if it's just our corner!
-	if ( BlockDefinition::IsSolid( biForBackLeftCorner.GetBlock()->GetBlockType() ) ) return true;
-	if ( BlockDefinition::IsSolid( biForBackRightCorner.GetBlock( )->GetBlockType( ) ) ) return true;
-	if ( BlockDefinition::IsSolid( biForFrontLeftCorner.GetBlock( )->GetBlockType( ) ) ) return true;
-	if ( BlockDefinition::IsSolid( biForFrontRightCorner.GetBlock( )->GetBlockType( ) ) ) return true;
+	if ( BlockDefinition::IsSolid( biForBackLeftCorner.GetBlock()->GetBlockType() ) ) 
+		return true;
+	if ( BlockDefinition::IsSolid( biForBackRightCorner.GetBlock( )->GetBlockType( ) ) ) 
+		return true;
+	if ( BlockDefinition::IsSolid( biForFrontLeftCorner.GetBlock( )->GetBlockType( ) ) ) 
+		return true;
+	if ( BlockDefinition::IsSolid( biForFrontRightCorner.GetBlock( )->GetBlockType( ) ) ) 
+		return true;
 
 	return false;
 }
@@ -1861,8 +1940,10 @@ void World::PlayDiggingSound( BlockType blockTypeDug, float deltaSeconds )
 void World::PlayWalkingSound( float deltaMove )
 {
 	m_distanceSinceLastWalkSound += deltaMove;
-	if ( m_distanceSinceLastWalkSound - GetRandomFloatZeroToOne() < DISTANCE_BETWEEN_WALK_SOUNDS ) return;
-	else m_distanceSinceLastWalkSound = 0.f;
+	if ( m_distanceSinceLastWalkSound - GetRandomFloatZeroToOne() < DISTANCE_BETWEEN_WALK_SOUNDS ) 
+		return;
+	else 
+		m_distanceSinceLastWalkSound = 0.f;
 
 	//Get the player's x, y, and the z of their feet.
 	WorldCoords playerFeetPos = m_player->GetFeetPos();
@@ -1874,35 +1955,45 @@ void World::PlayWalkingSound( float deltaMove )
 	BlockInfo biForFrontLeftCorner = GetBlockInfoFromWorldCoords( playerFeetPos + WorldCoords( PLAYER_HALF_WIDTH, PLAYER_HALF_WIDTH, 0.f ) );
 	BlockInfo biForFrontRightCorner = GetBlockInfoFromWorldCoords( playerFeetPos + WorldCoords( PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0.f ) );
 
-	if ( !( biForBackLeftCorner.StepDown() && biForBackRightCorner.StepDown() && biForFrontLeftCorner.StepDown() && biForFrontRightCorner.StepDown() ) ) return; //Move failed.
+	if ( !( biForBackLeftCorner.StepDown() && biForBackRightCorner.StepDown() && biForFrontLeftCorner.StepDown() && biForFrontRightCorner.StepDown() ) ) 
+		return; //Move failed.
 
 	std::vector< BlockType > soundCandidates;
 	BlockType backLeftType = biForBackLeftCorner.GetBlock()->GetBlockType();
-	if ( backLeftType != AIR ) soundCandidates.push_back( backLeftType );
+	if ( backLeftType != AIR ) 
+		soundCandidates.push_back( backLeftType );
 	BlockType backRightType = biForBackRightCorner.GetBlock()->GetBlockType();
-	if ( backRightType != AIR ) soundCandidates.push_back( backRightType );
+	if ( backRightType != AIR ) 
+		soundCandidates.push_back( backRightType );
 	BlockType frontLeftType = biForFrontLeftCorner.GetBlock()->GetBlockType();
-	if ( frontLeftType != AIR ) soundCandidates.push_back( frontLeftType );
+	if ( frontLeftType != AIR ) 
+		soundCandidates.push_back( frontLeftType );
 	BlockType frontRightType = biForFrontRightCorner.GetBlock()->GetBlockType();
-	if ( frontRightType != AIR ) soundCandidates.push_back( frontRightType );
+	if ( frontRightType != AIR ) 
+		soundCandidates.push_back( frontRightType );
 
 	int numCandidates = (int)soundCandidates.size();
-	if ( numCandidates == 0 ) return;
-	else BlockDefinition::PlayWalkingSound( soundCandidates[ GetRandomIntInRange( 0.f, numCandidates-1.f ) ] );
+	if ( numCandidates == 0 ) 
+		return;
+	else 
+		BlockDefinition::PlayWalkingSound( soundCandidates[ GetRandomIntInRange( 0.f, numCandidates-1.f ) ] );
 }
 
 
+//--------------------------------------------------------------------------------------------------------------
 bool World::IsWorldPositionOnGround( WorldCoords position )
 {
-	return position.z - floor( position.z ) > THRESHOLD_TO_BE_CONSIDERED_ON_GROUND;
+	return ( position.z - floor( position.z ) ) > THRESHOLD_TO_BE_CONSIDERED_ON_GROUND;
 }
 
 //--------------------------------------------------------------------------------------------------------------
 void World::MarkBlockLightingDirty( const BlockInfo& bi )
 {
 	Block* blockToDirty = bi.GetBlock();
-	if ( blockToDirty == nullptr ) return;
-	if ( blockToDirty->IsLightingDirty() ) return; //Ensures no duplicate push-backs.
+	if ( blockToDirty == nullptr ) 
+		return;
+	if ( blockToDirty->IsLightingDirty() ) 
+		return; //Ensures no duplicate push-backs.
 
 	blockToDirty->SetLightingDirty();
 	m_dirtyBlocks.push_back( bi );

@@ -97,10 +97,6 @@ void AudioSystem::InitializeFMOD()
 //---------------------------------------------------------------------------
 AudioSystem::~AudioSystem()
 {
-// 	FMOD_RESULT result = FMOD_OK;
-// 	result = FMOD_System_Close( m_fmodSystem );
-// 	result = FMOD_System_Release( m_fmodSystem );
-// 	m_fmodSystem = nullptr;
 }
 
 

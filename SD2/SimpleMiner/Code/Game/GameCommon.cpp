@@ -38,6 +38,7 @@ char KEY_TO_TOGGLE_PLAYER_COLLIDER = 'B';
 char KEY_TO_TOGGLE_MOVEMENT_MODE = 'P';
 char KEY_TO_TOGGLE_VBO_AND_VA = VK_F8;
 char KEY_TO_TOGGLE_CULLING = VK_F9;
+char KEY_TO_TOGGLE_DIMENSION = 'N'; //N for Nether!
 
 const SpriteSheet* g_textureAtlas;
 

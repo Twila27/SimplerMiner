@@ -47,10 +47,22 @@ void Chunk::PopulateChunkWithFlatStructure()
 {
 	for ( int blockIndex = 0; blockIndex < NUM_COLUMNS_PER_CHUNK; blockIndex++ )
 	{
-		if ( blockIndex < STONE_EXCLUSIVE_HEIGHT_LIMIT ) m_blocks[ blockIndex ].SetBlockType( BlockType::STONE );
-		else if ( blockIndex < DIRT_EXCLUSIVE_HEIGHT_LIMIT ) m_blocks[ blockIndex ].SetBlockType( BlockType::DIRT );
-		else if ( blockIndex < GRASS_EXCLUSIVE_HEIGHT_LIMIT ) m_blocks[ blockIndex ].SetBlockType( BlockType::GRASS );
-		else if ( blockIndex < AIR_EXCLUSIVE_HEIGHT_LIMIT ) m_blocks[ blockIndex ].SetBlockType( BlockType::AIR );
+		if ( blockIndex < STONE_EXCLUSIVE_HEIGHT_LIMIT )
+		{
+			m_blocks[ blockIndex ].SetBlockType( BlockType::STONE );
+		}
+		else if ( blockIndex < DIRT_EXCLUSIVE_HEIGHT_LIMIT )
+		{
+			m_blocks[ blockIndex ].SetBlockType( BlockType::DIRT );
+		}
+		else if ( blockIndex < GRASS_EXCLUSIVE_HEIGHT_LIMIT )
+		{
+			m_blocks[ blockIndex ].SetBlockType( BlockType::GRASS );
+		}
+		else if ( blockIndex < AIR_EXCLUSIVE_HEIGHT_LIMIT )
+		{
+			m_blocks[ blockIndex ].SetBlockType( BlockType::AIR );
+		}
 	}
 }
 
@@ -97,20 +109,27 @@ void Chunk::PopulateColumnWithOverworldBlocksWithPerlinNoise( int columnIndex, i
 		LocalColumnCoords lcc = GetLocalColumnCoordsFromChunkColumnIndex( columnIndex );
 		LocalBlockCoords lbc = LocalBlockCoords( lcc.x, lcc.y, blockHeight );
 		LocalBlockIndex lbi = GetLocalBlockIndexFromLocalBlockCoords( lbc );
+
 		if ( blockHeight > groundHeight )
 		{
-			if ( blockHeight < SEA_LEVEL_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::WATER );
-			else m_blocks[ lbi ].SetBlockType( BlockType::AIR );
+			if ( blockHeight < SEA_LEVEL_HEIGHT_LIMIT )
+				m_blocks[ lbi ].SetBlockType( BlockType::WATER );
+			else
+				m_blocks[ lbi ].SetBlockType( BlockType::AIR );
 		}
 		else if ( blockHeight == groundHeight )
 		{
-			if ( blockHeight <= SEA_LEVEL_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::SAND );
-			else m_blocks[ lbi ].SetBlockType( BlockType::GRASS );
+			if ( blockHeight <= SEA_LEVEL_HEIGHT_LIMIT ) 
+				m_blocks[ lbi ].SetBlockType( BlockType::SAND );
+			else 
+				m_blocks[ lbi ].SetBlockType( BlockType::GRASS );
 		}
 		else if ( blockHeight > groundHeight - NUM_DIRT_LAYERS )
 		{
-			if ( blockHeight <= SEA_LEVEL_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::SAND );
-			m_blocks[ lbi ].SetBlockType( BlockType::DIRT );
+			if ( blockHeight <= SEA_LEVEL_HEIGHT_LIMIT )
+				m_blocks[ lbi ].SetBlockType( BlockType::SAND );
+			else
+				m_blocks[ lbi ].SetBlockType( BlockType::DIRT );
 		}
 		else m_blocks[ lbi ].SetBlockType( BlockType::STONE );
 	}
@@ -144,13 +163,17 @@ void Chunk::PopulateColumnWithNetherBlocksWithPerlinNoise( GlobalColumnCoords gl
 		}
 		else if ( blockHeight == groundHeight ) //Nether's grass.
 		{
-			if ( blockHeight <= NETHER_LAVA_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::RED_SAND );
-			else m_blocks[ lbi ].SetBlockType( BlockType::MYCELIUM );
+			if ( blockHeight <= NETHER_LAVA_HEIGHT_LIMIT ) 
+				m_blocks[ lbi ].SetBlockType( BlockType::RED_SAND );
+			else 
+				m_blocks[ lbi ].SetBlockType( BlockType::MYCELIUM );
 		}
 		else if ( blockHeight > groundHeight && blockHeight < ceilingHeight ) //Air.
 		{
-			if ( blockHeight < NETHER_LAVA_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::LAVA );
-			else m_blocks[ lbi ].SetBlockType( BlockType::AIR );
+			if ( blockHeight < NETHER_LAVA_HEIGHT_LIMIT ) 
+				m_blocks[ lbi ].SetBlockType( BlockType::LAVA );
+			else 
+				m_blocks[ lbi ].SetBlockType( BlockType::AIR );
 		}
 		else if ( blockHeight == ceilingHeight ) //Top.
 		{
@@ -161,13 +184,12 @@ void Chunk::PopulateColumnWithNetherBlocksWithPerlinNoise( GlobalColumnCoords gl
 		}
 		else if ( blockHeight >= ceilingHeight && blockHeight < ceilingHeight + NUM_DIRT_LAYERS )
 		{
-			if ( blockHeight <= NETHER_LAVA_HEIGHT_LIMIT ) m_blocks[ lbi ].SetBlockType( BlockType::RED_SAND );
-			m_blocks[ lbi ].SetBlockType( BlockType::NETHERRACK );
+			if ( blockHeight <= NETHER_LAVA_HEIGHT_LIMIT ) 
+				m_blocks[ lbi ].SetBlockType( BlockType::RED_SAND );
+			else
+				m_blocks[ lbi ].SetBlockType( BlockType::NETHERRACK );
 		}
-		else
-		{
-			m_blocks[ lbi ].SetBlockType( BlockType::BROWNSTONE );
-		}
+		else m_blocks[ lbi ].SetBlockType( BlockType::BROWNSTONE );
 	}
 }
 
@@ -217,10 +239,10 @@ void Chunk::BuildVillageRoads( GlobalBlockCoords villageWorldMins, GlobalBlockCo
 		{
 			GlobalColumnCoords currentColumn = GlobalColumnCoords( (float)x, (float)y );
 			int currentColumnGroundHeight = GetGroundHeightWithPerlinNoiseForColumn( currentColumn );
-			BlockType roadType = GRAVEL; //( m_chunkDimension == DIM_NETHER ? MYCELIUM : GRAVEL );
+			BlockType roadType = GRAVEL; //( m_chunkDimension == DIM_NETHER ? MYCELIUM : GRAVEL ); -- didn't look quite right, but try another this way sometime.
 
-			bool inRangeOnX = ( x < villageWorldCenter.x + roadRadius && x > villageWorldCenter.x - roadRadius );
-			bool inRangeOnY = ( y < villageWorldCenter.y + roadRadius && y > villageWorldCenter.y - roadRadius );
+			bool inRangeOnX = ( ( x < ( villageWorldCenter.x + roadRadius ) ) && ( x > ( villageWorldCenter.x - roadRadius ) ) );
+			bool inRangeOnY = ( ( y < ( villageWorldCenter.y + roadRadius ) ) && ( y > ( villageWorldCenter.y - roadRadius ) ) );
 			if ( inRangeOnX || inRangeOnY )
 			{
 				SetBlockTypeIfLocal( GlobalBlockCoords( x, y, currentColumnGroundHeight ), roadType );
@@ -325,14 +347,14 @@ void Chunk::BuildPortalShrine( GlobalBlockCoords shrineWorldMins, GlobalBlockCoo
 	for ( int y = shrineWorldMins.y; y <= shrineWorldMaxs.y; y++ )
 	{
 		//Skip outer ring.
-		if ( y <= ( shrineWorldMins.y + 1 ) || y >= ( shrineWorldMaxs.y - 1 ) )
+		if ( ( y <= ( shrineWorldMins.y + 1 ) ) || ( y >= ( shrineWorldMaxs.y - 1 ) ) )
 			continue;
 
 		//Fill rows inside outer ring.
 		for ( int x = shrineWorldMins.x; x <= shrineWorldMaxs.x; x++ )
 		{
 			//Skip outer ring.
-			if ( x <= ( shrineWorldMins.x + 1 ) || x >= ( shrineWorldMaxs.x - 1 ) ) 
+			if ( ( x <= ( shrineWorldMins.x + 1 ) ) || ( x >= ( shrineWorldMaxs.x - 1 ) ) ) 
 				continue;
 
 			SetBlockTypeIfLocal( GlobalBlockCoords( x, y, portalPlatformHeight ), BlockType::GLOWSTONE );
@@ -435,7 +457,7 @@ void Chunk::BuildPond( GlobalBlockCoords pondWorldMins, GlobalBlockCoords pondWo
 				{
 					SetBlockTypeIfLocal( currentBlockWorldMins, wallType );
 				}
-				else if ( x == pondWorldMins.x || x == pondWorldMaxs.x || y == pondWorldMins.y || y == pondWorldMaxs.y )
+				else if ( ( x == pondWorldMins.x ) || ( x == pondWorldMaxs.x ) || ( y == pondWorldMins.y ) || ( y == pondWorldMaxs.y ) )
 				{
 					SetBlockTypeIfLocal( currentBlockWorldMins, wallType ); //Perimeter wall.
 				}
@@ -508,11 +530,11 @@ int Chunk::GetGroundHeightWithPerlinNoiseForColumn( GlobalColumnCoords globalCol
 		perlinGridCellSize,
 		perlinNumOctaves,
 		perlinPersistancePercentage
-		);
+	);
 
 	int groundHeight = static_cast<int>( perlinAmplitude * perlinValue ) + minimumGroundHeight;
 
-	return groundHeight < 0 ? 0 : groundHeight; //In the case that the Perlin value is negative.
+	return ( groundHeight < 0 ) ? 0 : groundHeight; //In the case that the Perlin value is negative.
 }
 
 
@@ -531,12 +553,12 @@ int Chunk::GetCeilingHeightWithPerlinNoiseForColumn( GlobalColumnCoords globalCo
 		perlinGridCellSize,
 		perlinNumOctaves,
 		perlinPersistancePercentage
-		);
+	);
 
 	int ceilingHeight = (int)( perlinAmplitude * perlinValue ) + maximumCeilingHeight;
 
 
-	return ceilingHeight >= CHUNK_Z_HEIGHT_IN_BLOCKS ? CHUNK_Z_HEIGHT_IN_BLOCKS - 1 : ceilingHeight; //Don't exceed sky either.
+	return ( ceilingHeight >= CHUNK_Z_HEIGHT_IN_BLOCKS ) ? CHUNK_Z_HEIGHT_IN_BLOCKS - 1 : ceilingHeight; //Don't exceed sky either.
 }
 
 
@@ -560,22 +582,22 @@ GlobalColumnCoords Chunk::LookForVillageCenterWithPerlinNoiseAroundColumn( Globa
 			GlobalColumnCoords northNeighborToCurrentColumn = GlobalColumnCoords( x, y + 1 );
 			GlobalColumnCoords southNeighborToCurrentColumn = GlobalColumnCoords( x, y - 1 );
 			GlobalColumnCoords eastNeighborToCurrentColumn = GlobalColumnCoords( x + 1, y );
-			GlobalColumnCoords westNeighborToCurrentColumn = GlobalColumnCoords( x - 1, y );
-// 			GlobalColumnCoords northeastNeighborToCurrentColumn = GlobalColumnCoords( x + 1, y + 1 ); //TODO: Trying to half the calls by halving neighbors checked.
+			GlobalColumnCoords westNeighborToCurrentColumn = GlobalColumnCoords( x - 1, y ); //Halving the calls by halving neighbors checked, i.e. excluding:
+// 			GlobalColumnCoords northeastNeighborToCurrentColumn = GlobalColumnCoords( x + 1, y + 1 );
 // 			GlobalColumnCoords southeastNeighborToCurrentColumn = GlobalColumnCoords( x + 1, y - 1 );
 // 			GlobalColumnCoords northwestNeighborToCurrentColumn = GlobalColumnCoords( x - 1, y + 1 );
 // 			GlobalColumnCoords southwestNeighborToCurrentColumn = GlobalColumnCoords( x - 1, y - 1 );
 
-//			float currentVillagePerlinGridValue = 1.f; //Makes it a world of villages if uncommented!
+//			float currentVillagePerlinGridValue = 1.f; //Makes it a world of villages if uncommented! Kept for easy testing.
 
-			float currentVillagePerlinGridValue = ComputePerlinNoiseValueAtPosition2D( //TODO: USE [smoothed?] RAW NOISE FUNC
+			float currentVillagePerlinGridValue = ComputePerlinNoiseValueAtPosition2D(
 				columnToSearch,
 				VILLAGE_PERLIN_GRID_CELL_SIZE,
 				VILLAGE_PERLIN_GRID_NUM_OCTAVES,
 				VILLAGE_PERLIN_GRID_PERSISTANCE
-				);
+			);
 
-				if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( northNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
+			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( northNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
 				continue;
 			
 			if ( currentVillagePerlinGridValue <= ComputePerlinNoiseValueAtPosition2D( southNeighborToCurrentColumn, VILLAGE_PERLIN_GRID_CELL_SIZE, VILLAGE_PERLIN_GRID_NUM_OCTAVES, VILLAGE_PERLIN_GRID_PERSISTANCE ) )
@@ -611,8 +633,10 @@ void Chunk::PopulateChunkWithRleString( const std::vector< unsigned char >& rleS
 			Block& currentBlock = m_blocks[ currentBlockIndex + blockIndex ];
 			currentBlock.SetBlockType( currentType );
 
-			if ( BlockDefinition::IsOpaque( currentType ) ) currentBlock.SetBlockToBeOpaque( );
-			else currentBlock.SetBlockToNotBeOpaque();
+			if ( BlockDefinition::IsOpaque( currentType ) ) 
+				currentBlock.SetBlockToBeOpaque( );
+			else 
+				currentBlock.SetBlockToNotBeOpaque();
 
 		}
 		currentBlockIndex += numOfType;
@@ -627,8 +651,11 @@ void Chunk::RebuildVertexArray()
 	vertexes.reserve( 10000 );
 	PopulateChunkVertexArray( vertexes );
 	m_numVertexes = vertexes.size();
-	if ( g_renderChunksWithVertexArrays ) m_vertexes = vertexes;
-	/*else*/ g_theRenderer->UpdateVbo( m_vboID, vertexes.data(), m_numVertexes * sizeof( Vertex3D_PCT ) );
+	
+	if ( g_renderChunksWithVertexArrays ) 
+		m_vertexes = vertexes;
+	
+	g_theRenderer->UpdateVbo( m_vboID, vertexes.data(), m_numVertexes * sizeof( Vertex3D_PCT ) );
 	m_isVertexArrayDirty = false;
 }
 
@@ -636,9 +663,13 @@ void Chunk::RebuildVertexArray()
 //--------------------------------------------------------------------------------------------------------------
 void Chunk::Render() const
 {
-	if ( !m_isVisible ) return;
-	if ( g_renderChunksWithVertexArrays ) RenderWithVertexArray();
-	else RenderWithVbo();
+	if ( !m_isVisible ) 
+		return;
+
+	if ( g_renderChunksWithVertexArrays ) 
+		RenderWithVertexArray();
+	else 
+		RenderWithVbo();
 }
 
 
@@ -705,11 +736,14 @@ bool Chunk::ShouldFaceRender(BlockFace face, LocalBlockIndex thisBlockIndex )
 		case FRONT: successInStepping = neighborBlock.StepWest(); break; //-x, south because looking down +x.
 		case BACK: successInStepping = neighborBlock.StepEast(); break; //+x, north.
 	}
-	if ( !successInStepping ) return true; //Typically should mean on neighborless chunk edge.
+
+	if ( !successInStepping ) 
+		return true; //Typically should mean on neighborless chunk edge.
 
 	//If this is below the next check it will not render water right, as water on water will be told it should not render when it should.
 	BlockType myBlockType = m_blocks[ thisBlockIndex ].GetBlockType();
-	BlockType neighborBlockType = neighborBlock.m_myChunk->GetBlockFromLocalBlockIndex( neighborBlock.m_myBlockIndex )->GetBlockType();
+	Block* blockData = neighborBlock.m_myChunk->GetBlockFromLocalBlockIndex( neighborBlock.m_myBlockIndex );
+	BlockType neighborBlockType = blockData->GetBlockType();
 	if ( BlockDefinition::IsOpaque( neighborBlockType ) == false ) 
 		return true; //If neighbor is NOT opaque, e.g. air, need to render.
 
@@ -945,39 +979,44 @@ void Chunk::RenderBlockWithDrawAABB( BlockType blockType, const WorldCoords& ren
 	g_theRenderer->EnableBackfaceCulling( true );
 
 	AABB2 texCoords[ 6 ];
+	AABB2 texCoord;
 	switch ( blockType )
 	{
 	case BlockType::AIR:
-		texCoords[ 0 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 ); //top mins
-		texCoords[ 1 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 );
-		texCoords[ 2 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 );
-		texCoords[ 3 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 ); //collapse 4 sides to 1 of 3 lines -- side mins
-		texCoords[ 4 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 );
-		texCoords[ 5 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 ); //bottom mins
+		texCoord = g_textureAtlas->GetTexCoordsFromSpriteCoords( 0, 0 );
+		texCoords[ 0 ] = texCoord; //top mins
+		texCoords[ 1 ] = texCoord;
+		texCoords[ 2 ] = texCoord;
+		texCoords[ 3 ] = texCoord; //collapse 4 sides to 1 of 3 lines -- side mins
+		texCoords[ 4 ] = texCoord;
+		texCoords[ 5 ] = texCoord; //bottom mins
 		break;
 	case BlockType::DIRT:
-		texCoords[ 0 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
-		texCoords[ 1 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
-		texCoords[ 2 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
-		texCoords[ 3 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
-		texCoords[ 4 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
-		texCoords[ 5 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
+		texCoord = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
+		texCoords[ 0 ] = texCoord;
+		texCoords[ 1 ] = texCoord;
+		texCoords[ 2 ] = texCoord;
+		texCoords[ 3 ] = texCoord;
+		texCoords[ 4 ] = texCoord;
+		texCoords[ 5 ] = texCoord;
 		break;
 	case BlockType::GRASS:
+		texCoord = g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 8 );
 		texCoords[ 0 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 7, 8 );
 		texCoords[ 1 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 9, 8 );
-		texCoords[ 2 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 8 );
-		texCoords[ 3 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 8 );
-		texCoords[ 4 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 8 );
-		texCoords[ 5 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 8, 8 );
+		texCoords[ 2 ] = texCoord;
+		texCoords[ 3 ] = texCoord;
+		texCoords[ 4 ] = texCoord;
+		texCoords[ 5 ] = texCoord;
 		break;
 	case BlockType::STONE:
-		texCoords[ 0 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
-		texCoords[ 1 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
-		texCoords[ 2 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
-		texCoords[ 3 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
-		texCoords[ 4 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
-		texCoords[ 5 ] = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
+		texCoord = g_textureAtlas->GetTexCoordsFromSpriteCoords( 2, 10 );
+		texCoords[ 0 ] = texCoord;
+		texCoords[ 1 ] = texCoord;
+		texCoords[ 2 ] = texCoord;
+		texCoords[ 3 ] = texCoord;
+		texCoords[ 4 ] = texCoord;
+		texCoords[ 5 ] = texCoord;
 		break;
 	}
 
@@ -1031,12 +1070,18 @@ WorldCoords Chunk::GetWorldCoordsFromLocalBlockIndex( LocalBlockIndex lbi ) cons
 //--------------------------------------------------------------------------------------------------------------
 void Chunk::SetSelectedFace( const Vector3& directionOppositeFace )
 {
-	if ( directionOppositeFace == WORLD_UP ) m_selectedFace = BOTTOM;
-	else if ( directionOppositeFace == WORLD_DOWN ) m_selectedFace = TOP;
-	else if ( directionOppositeFace == WORLD_LEFT ) m_selectedFace = RIGHT;
-	else if ( directionOppositeFace == WORLD_RIGHT ) m_selectedFace = LEFT;
-	else if ( directionOppositeFace == WORLD_FORWARD ) m_selectedFace = BACK;
-	else if ( directionOppositeFace == WORLD_BACKWARD ) m_selectedFace = FRONT;
+	if ( directionOppositeFace == WORLD_UP ) 
+		m_selectedFace = BOTTOM;
+	else if ( directionOppositeFace == WORLD_DOWN ) 
+		m_selectedFace = TOP;
+	else if ( directionOppositeFace == WORLD_LEFT ) 
+		m_selectedFace = RIGHT;
+	else if ( directionOppositeFace == WORLD_RIGHT ) 
+		m_selectedFace = LEFT;
+	else if ( directionOppositeFace == WORLD_FORWARD ) 
+		m_selectedFace = BACK;
+	else if ( directionOppositeFace == WORLD_BACKWARD ) 
+		m_selectedFace = FRONT;
 }
 
 
@@ -1049,22 +1094,22 @@ Rgba Chunk::GetLightColorForLightLevel( int lightLevel ) const
 	{
 		switch ( lightLevel )
 		{
-		case 0: return Rgba( .3f, 0.f, 0.f );
-		case 1: return Rgba( 0.f, 1.f, 0.f );
-		case 2: return Rgba( 0.f, 0.f, 1.f );
-		case 3: return Rgba( 1.f, 1.f, 0.f );
-		case 4: return Rgba( 0.f, 1.f, 1.f );
-		case 5: return Rgba( 1.f, 0.f, 1.f );
-		case 6: return Rgba( .75f, 0.f, 0.f );
-		case 7: return Rgba( 0.f, .75f, 0.f );
-		case 8: return Rgba( 0.f, 0.f, .75f );
-		case 9: return Rgba( .75f, .75f, 0.f );
-		case 10: return Rgba( 0.f, .75f, .75f );
-		case 11: return Rgba( .75f, 0.f, .75f );
-		case 12: return Rgba( .75f, .75f, .75f );
-		case 13: return Rgba( 0.f, .33f, 0.f );
-		case 14: return Rgba( 0.f, 0.f, .33f );
-		case 15: return Rgba::WHITE;
+			case 0: return Rgba( .3f, 0.f, 0.f );
+			case 1: return Rgba( 0.f, 1.f, 0.f );
+			case 2: return Rgba( 0.f, 0.f, 1.f );
+			case 3: return Rgba( 1.f, 1.f, 0.f );
+			case 4: return Rgba( 0.f, 1.f, 1.f );
+			case 5: return Rgba( 1.f, 0.f, 1.f );
+			case 6: return Rgba( .75f, 0.f, 0.f );
+			case 7: return Rgba( 0.f, .75f, 0.f );
+			case 8: return Rgba( 0.f, 0.f, .75f );
+			case 9: return Rgba( .75f, .75f, 0.f );
+			case 10: return Rgba( 0.f, .75f, .75f );
+			case 11: return Rgba( .75f, 0.f, .75f );
+			case 12: return Rgba( .75f, .75f, .75f );
+			case 13: return Rgba( 0.f, .33f, 0.f );
+			case 14: return Rgba( 0.f, 0.f, .33f );
+			case 15: return Rgba::WHITE;
 		}
 	}
 
@@ -1077,7 +1122,7 @@ Rgba Chunk::GetLightColorForLightLevel( int lightLevel ) const
 //--------------------------------------------------------------------------------------------------------------
 void Chunk::SetCurrentSkyLightLevel( int clampedNewLightLevel )
 {
-	ASSERT_OR_DIE( clampedNewLightLevel >= 0 && clampedNewLightLevel <= MAX_LIGHTING_LEVEL, "SetLightLevel Given Argument Beyond Max Level" );
+	ASSERT_OR_DIE( ( clampedNewLightLevel >= 0 ) && ( clampedNewLightLevel <= MAX_LIGHTING_LEVEL ), "SetLightLevel Given Argument Beyond Max Level" );
 	m_currentSkyLightLevel = clampedNewLightLevel;
 }
 
@@ -1085,7 +1130,8 @@ void Chunk::SetCurrentSkyLightLevel( int clampedNewLightLevel )
 //--------------------------------------------------------------------------------------------------------------
 bool Chunk::IsBlockSolid( LocalBlockIndex lbi ) const
 {
-	return BlockDefinition::IsSolid( m_blocks[ lbi ].GetBlockType() );
+	BlockType blockType = m_blocks[ lbi ].GetBlockType();
+	return BlockDefinition::IsSolid( blockType );
 }
 
 
@@ -1111,8 +1157,10 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 			out_blockPlaced->m_myBlockIndex = lbi;
 		}
 
-		if ( BlockDefinition::IsOpaque( m_blocks[ lbi ].GetBlockType() ) ) m_blocks[ lbi ].SetBlockToBeOpaque();
-		else m_blocks[ lbi ].SetBlockToNotBeOpaque();
+		if ( BlockDefinition::IsOpaque( m_blocks[ lbi ].GetBlockType() ) ) 
+			m_blocks[ lbi ].SetBlockToBeOpaque();
+		else 
+			m_blocks[ lbi ].SetBlockToNotBeOpaque();
 
 		m_isVertexArrayDirty = true;
 		return;
@@ -1126,13 +1174,15 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 		case BlockFace::BOTTOM:
 		{
 			newBlockLbc.z--;
-			if ( newBlockLbc.z < 0 ) return; //Can't place blocks below chunks.
+			if ( newBlockLbc.z < 0 ) 
+				return; //Can't place blocks below chunks.
 			break;
 		}
 		case BlockFace::TOP:
 		{
 			newBlockLbc.z++;
-			if ( newBlockLbc.z > CHUNK_Z_HEIGHT_IN_BLOCKS - 1 ) return; //Can't place blocks above chunks.
+			if ( newBlockLbc.z > CHUNK_Z_HEIGHT_IN_BLOCKS - 1 ) 
+				return; //Can't place blocks above chunks.
 			break;
 		}
 		case BlockFace::LEFT:
@@ -1140,7 +1190,8 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 			newBlockLbc.y++;
 			if ( newBlockLbc.y > CHUNK_Y_WIDTH_IN_BLOCKS - 1 )
 			{
-				if ( this->m_westNeighbor == nullptr ) return; //No neighbor to place into loaded.
+				if ( this->m_westNeighbor == nullptr ) 
+					return; //No neighbor to place into loaded.
 
 				newBlockLbc.y = 0;
 				LocalBlockIndex lbiInNeighborChunk = GetLocalBlockIndexFromLocalBlockCoords( newBlockLbc );
@@ -1154,7 +1205,8 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 			newBlockLbc.y--;
 			if ( newBlockLbc.y < 0 )
 			{
-				if ( this->m_eastNeighbor == nullptr ) return; //No neighbor to place into loaded.
+				if ( this->m_eastNeighbor == nullptr ) 
+					return; //No neighbor to place into loaded.
 
 				newBlockLbc.y = CHUNK_Y_WIDTH_IN_BLOCKS - 1;
 				LocalBlockIndex lbiInNeighborChunk = GetLocalBlockIndexFromLocalBlockCoords( newBlockLbc );
@@ -1168,7 +1220,8 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 			newBlockLbc.x--;
 			if ( newBlockLbc.x < 0 )
 			{
-				if ( this->m_southNeighbor == nullptr ) return; //No neighbor to place into loaded.
+				if ( this->m_southNeighbor == nullptr ) 
+					return; //No neighbor to place into loaded.
 
 				newBlockLbc.x = CHUNK_X_LENGTH_IN_BLOCKS - 1;
 				LocalBlockIndex lbiInNeighborChunk = GetLocalBlockIndexFromLocalBlockCoords( newBlockLbc );
@@ -1182,7 +1235,8 @@ void Chunk::PlaceBlock( LocalBlockIndex lbi, const Vector3& directionOppositeFac
 			newBlockLbc.x++;
 			if ( newBlockLbc.x > CHUNK_X_LENGTH_IN_BLOCKS - 1 )
 			{
-				if ( this->m_northNeighbor == nullptr ) return; //No neighbor to place into loaded.
+				if ( this->m_northNeighbor == nullptr ) 
+					return; //No neighbor to place into loaded.
 
 				newBlockLbc.x = 0;
 				LocalBlockIndex lbiInNeighborChunk = GetLocalBlockIndexFromLocalBlockCoords( newBlockLbc );
@@ -1215,7 +1269,9 @@ void Chunk::HighlightBlock( LocalBlockIndex lbi, Vector3 directionOppositeFace )
 //--------------------------------------------------------------------------------------------------------------
 Block* Chunk::GetBlockFromLocalBlockIndex( LocalBlockIndex m_myBlockIndex )
 {
-	if ( m_myBlockIndex < 0 || m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) return nullptr;
+	if ( ( m_myBlockIndex < 0 ) || ( m_myBlockIndex > NUM_BLOCKS_PER_CHUNK ) )
+		return nullptr;
+
 	return &m_blocks[ m_myBlockIndex ];
 }
 
@@ -1223,8 +1279,10 @@ Block* Chunk::GetBlockFromLocalBlockIndex( LocalBlockIndex m_myBlockIndex )
 //--------------------------------------------------------------------------------------------------------------
 Block* Chunk::GetBlockFromLocalBlockCoords( const LocalBlockCoords& lbc )
 {
-	if ( lbc.x < 0 || lbc.y < 0 || lbc.y < 0 || lbc.x > CHUNK_X_LENGTH_IN_BLOCKS 
-		 || lbc.y > CHUNK_Y_WIDTH_IN_BLOCKS || lbc.z > CHUNK_Z_HEIGHT_IN_BLOCKS  ) return nullptr;
+	if ( ( lbc.x < 0 ) || ( lbc.y < 0 ) || ( lbc.z < 0 ) || ( lbc.x > CHUNK_X_LENGTH_IN_BLOCKS )
+		 || ( lbc.y > CHUNK_Y_WIDTH_IN_BLOCKS ) || ( lbc.z > CHUNK_Z_HEIGHT_IN_BLOCKS ) ) 
+		return nullptr;
+
 	return &m_blocks[ GetLocalBlockIndexFromLocalBlockCoords( lbc ) ];
 }
 
@@ -1236,7 +1294,11 @@ void Chunk::GetRleString( std::vector< unsigned char >& out_rleBuffer )
 	int numOfTypeSeen = 1;
 	for ( int blockIndex = 1; blockIndex < NUM_BLOCKS_PER_CHUNK; blockIndex++ )
 	{
-		if ( currentType == m_blocks[ blockIndex ].GetBlockType() && numOfTypeSeen < 255) numOfTypeSeen++; //0-255 a pair.
+		BlockType indexedBlockType = m_blocks[ blockIndex ].GetBlockType();
+		if ( ( currentType == indexedBlockType ) && ( numOfTypeSeen < 255 ) )
+		{
+			numOfTypeSeen++; //0-255 a pair.
+		}
 		else
 		{
 			out_rleBuffer.push_back( currentType );

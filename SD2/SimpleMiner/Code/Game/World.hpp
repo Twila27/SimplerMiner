@@ -57,13 +57,13 @@ private:
 	Vector3 GetPhysicsCorrectedVelocityForDeltaSeconds( const Vector3& velocityToPrevent, Vector3& posToMove, float deltaSeconds );
 
 	bool BoxTraceWithStepAndSample( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& hitResult );
-	bool BoxTraceWithTwelveRaygancasts( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& minHitResult );
+	bool BoxTraceWithAmanatidesWoo( const Vector3& rayStartPos, const Vector3& rayEndPos, RaycastResult3D& minHitResult );
 	bool BoxTraceWithAmanatidesWoo( Vector3 boxCenterStartPos, Vector3 boxCenterEndPos, float boxHalfLengthX, float boxHalfWidthY, float boxHalfHeightZ, RaycastResult3D& out_result );
 
 	void SelectBlock( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, float deltaSeconds );
 	void UnhighlightSelectedBlock();
 	bool RaycastWithStepAndSample( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, RaycastResult3D& out_result );
-	bool RaygancastWithAmanatidesWoo( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, RaycastResult3D& out_result );
+	bool RaycastWithAmanatidesWoo( const WorldCoords& selectorsPos, const WorldCoords& endOfSelectionRay, RaycastResult3D& out_result );
 
 	void DeactivateFarthestObsoleteChunk();
 	void ActivateNearestMissingChunk();
@@ -78,7 +78,7 @@ private:
 	void UpdateNeighborPointers( Chunk* newChunk );
 	void NullifyNeighborPointers( Chunk* obsoleteChunk );
 
-	BlockType GetBlockTypeFromWorldCoords( WorldCoords wc );
+	BlockType GetBlockTypeFromWorldCoords( const WorldCoords& wc );
 	BlockInfo GetBlockInfoFromWorldCoords( const WorldCoords& wc );
 	BlockInfo GetBlockInfoFromGlobalBlockCoords( const GlobalBlockCoords& blockPos );
 	GlobalBlockCoords GetGlobalBlockCoordsFromBlockInfo( const BlockInfo& blockInfo );
@@ -104,6 +104,9 @@ private:
 	bool IsWorldPositionOnGround( WorldCoords position );
 
 private:
+
+	void CheckForDimensionWarp();
+	void CheckForHotbarChange();
 
 	std::deque< BlockInfo > m_dirtyBlocks;
 	Camera3D* m_playerCamera;

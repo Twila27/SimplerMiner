@@ -710,7 +710,6 @@ void TheRenderer::UnbindTexture() //Actually just textured drawing with white 1x
 //--------------------------------------------------------------------------------------------------------------
 void TheRenderer::DrawSphere( const int vertexGroupingRule, const Vector3& centerPos, float radius, float numSlices, float numSidesPerSlice, const Rgba& tint /*= Rgba()*/, float lineThickness /*= 1.0f*/ )
 {
-	//TODO: BE SMARTER. Figure out how people actually render spheres. Clearly not spherical if looked at down a non-major axis!
 	UNREFERENCED_PARAMETER( numSlices );
 
 	UnbindTexture();
@@ -774,80 +773,6 @@ void TheRenderer::DrawSphere( const int vertexGroupingRule, const Vector3& cente
 	y = centerPos.y + ( radius * SinDegrees( 0.f ) );
 	vertexes.push_back( Vertex3D_PCT( Vector3( x, y, centerPos.z ), tint ) );
 
-
-// 
-// 	for ( float currentX = sphereMinX; currentX <= sphereMaxX; currentX += stepBetweenRings )
-// 	{
-// 		float fractionAlongSphere = ( currentX / sphereMaxX );
-// 		if ( fractionAlongSphere <= .5f ) scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 0.f, 2.f*radius );
-// 		else scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 2.f*radius, 0.f );
-// 
-// 		//Build 2D circle in YZ at currentX.
-// 		for ( float degrees = 0.f; degrees < degreesTotal; degrees += degreesPerSide )
-// 		{
-// 			float y = centerPos.y + ( scaledRadius * CosDegrees( degrees ) );
-// 			float z = centerPos.z + ( scaledRadius * SinDegrees( degrees ) );
-// 
-// 			if ( degrees != 0.f ) //Else would add an extra initial edge from first vertex to itself.
-// 				vertexes.push_back( Vertex3D_PCT( Vector3( currentX, y, z ), tint ) );
-// 
-// 			vertexes.push_back( Vertex3D_PCT( Vector3( currentX, y, z ), tint ) ); //For drawing AS_LINES.
-// 		}
-// 		//Connect back to 2D circle's starting vertex.
-// 		float y = centerPos.y + ( scaledRadius * CosDegrees( 0.f ) );
-// 		float z = centerPos.z + ( scaledRadius * SinDegrees( 0.f ) );
-// 		vertexes.push_back( Vertex3D_PCT( Vector3( currentX, y, z ), tint ) );
-// 	}
-
-// 	float sphereMinY = centerPos.y - radius;
-// 	float sphereMaxY = centerPos.y + radius;
-// 	for ( float currentY = sphereMinY; currentY <= sphereMaxY; currentY += stepBetweenRings )
-// 	{
-// 		float fractionAlongSphere = ( currentY / sphereMaxY );
-// 		if ( fractionAlongSphere <= .5f ) scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 0.f, 2.f*radius );
-// 		else scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 2.f*radius, 0.f );
-// 
-// 		//Build 2D circle in XZ at currentY.
-// 		for ( float degrees = 0.f; degrees < degreesTotal; degrees += degreesPerSide )
-// 		{
-// 			float x = centerPos.x + ( scaledRadius * CosDegrees( degrees ) );
-// 			float z = centerPos.z + ( scaledRadius * SinDegrees( degrees ) );
-// 
-// 			if ( degrees != 0.f ) //Else would add an extra initial edge from first vertex to itself.
-// 				vertexes.push_back( Vertex3D_PCT( Vector3( x, currentY, z ), tint ) );
-// 
-// 			vertexes.push_back( Vertex3D_PCT( Vector3( x, currentY, z ), tint ) ); //For drawing AS_LINES.
-// 		}
-// 		//Connect back to 2D circle's starting vertex.
-// 		float x = centerPos.x + ( scaledRadius * CosDegrees( 0.f ) );
-// 		float z = centerPos.z + ( scaledRadius * SinDegrees( 0.f ) );
-// 		vertexes.push_back( Vertex3D_PCT( Vector3( x, currentY, z ), tint ) );
-// 	}
-// 
-// 	float sphereMinZ = centerPos.z - radius;
-// 	float sphereMaxZ = centerPos.z + radius;
-// 	for ( float currentZ = sphereMinZ; currentZ <= sphereMaxZ; currentZ += stepBetweenRings )
-// 	{
-// 		float fractionAlongSphere = Interpolate( 0.f, 1.f, ( currentZ / sphereMaxZ ) ); //I think we want to scale by a sin or cos of degrees!!!!!
-// 		if ( fractionAlongSphere <= .5f ) scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 0.f, 2.f*radius );
-// 		else scaledRadius = RangeMap( fractionAlongSphere, 0.f, 1.f, 2.f*radius, 0.f );
-// 
-// 		//Build 2D circle in XY at currentZ.
-// 		for ( float degrees = 0.f; degrees < degreesTotal; degrees += degreesPerSide )
-// 		{
-// 			float x = centerPos.x + ( scaledRadius * CosDegrees( degrees ) );
-// 			float y = centerPos.y + ( scaledRadius * SinDegrees( degrees ) );
-// 
-// 			if ( degrees != 0.f ) //Else would add an extra initial edge from first vertex to itself.
-// 				vertexes.push_back( Vertex3D_PCT( Vector3( x, y, currentZ ), tint ) );
-// 
-// 			vertexes.push_back( Vertex3D_PCT( Vector3( x, y, currentZ ), tint ) ); //For drawing AS_LINES.
-// 		}
-// 		//Connect back to start of circle.
-// 		float x = centerPos.x + ( scaledRadius * CosDegrees( 0.f ) );
-// 		float y = centerPos.y + ( scaledRadius * SinDegrees( 0.f ) );
-// 		vertexes.push_back( Vertex3D_PCT( Vector3( x, y, currentZ ), tint ) );
-// 	}
 
 	DrawVertexArray_PCT( vertexGroupingRule, vertexes, vertexes.size( ) ); //AS_LINES is the ideal.
 }

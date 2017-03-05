@@ -265,20 +265,6 @@ bool IsPointInDisc( const Vector2& point, const Vector2& discCenter, float discR
 }
 
 
-// --------------------------------------------------------------------------------------------------------------
-// float GetRandomFloatZeroToOne()
-// {
-// 	return rand() / (float)RAND_MAX;
-// }
-// 
-// 
-// --------------------------------------------------------------------------------------------------------------
-// float GetRandomFloatInRange( float min, float max )
-// {
-// 	return RangeMap( (float)rand(), 0.f, (float)RAND_MAX, min, max );
-// }
-
-
 //--------------------------------------------------------------------------------------------------------------
 int GetRandomIntInRange( float min, float max )
 {

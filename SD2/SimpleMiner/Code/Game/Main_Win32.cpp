@@ -244,7 +244,7 @@ void RunFrame()
 //-----------------------------------------------------------------------------------------------
 void Initialize( HINSTANCE applicationInstanceHandle )
 {
-	srand( static_cast<unsigned int>( time( NULL ) ) ); //TODO: BE SMARTER
+	srand( static_cast<unsigned int>( time( NULL ) ) );
 
 	SetProcessDPIAware();
 	CreateOpenGLWindow( applicationInstanceHandle );

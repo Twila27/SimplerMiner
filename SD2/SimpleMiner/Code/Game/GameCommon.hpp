@@ -65,6 +65,7 @@ extern char KEY_TO_TOGGLE_SKY_DEBUG;
 extern char KEY_TO_TOGGLE_MOVEMENT_MODE;
 extern char KEY_TO_TOGGLE_VBO_AND_VA;
 extern char KEY_TO_TOGGLE_CULLING;
+extern char KEY_TO_TOGGLE_DIMENSION;
 
 //Old Debug Render Commands (use Engine/Rendering/RenderCommand now).
 extern std::vector< Vertex3D_PCT > g_debugPoints;

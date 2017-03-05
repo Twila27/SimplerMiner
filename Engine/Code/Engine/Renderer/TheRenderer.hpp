@@ -87,7 +87,7 @@ public:
 
 	//VBO commands.
 	void CreateVbo( unsigned int& out_vboID ); //Returns ID.
-	void UpdateVbo( unsigned int vboID, const Vertex3D_PCT* vertexArrayData, unsigned vertexArraySizeInBytes );
+	void UpdateVbo( unsigned int vboID, const Vertex3D_PCT* vertexArrayData, unsigned int vertexArraySizeInBytes );
 	void BindVbo( unsigned int vboID );
 	void DestroyVbo( unsigned int vboID );
 
