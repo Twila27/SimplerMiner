@@ -12,10 +12,10 @@ Build Notes
     Data/Saves -- where the Player.txt position file is saved, delete this freely to reset to a default position.
       Data/Saves/Overworld -- where .chunk data files are saved.
       Data/Saves/Nether
-	2. Debug testing flags to toggle various features can be controlled via below hotkeys or hard-set in the source code's GameCommon.hpp/cpp.
-	3. To access other dimensions, find a purple portal block hiding inside a village's tall tower.
-		The easiest way to reach it is to jump while holding shift to use the boosted jump.
-		The portal in one dimension will currently drop the player from a location in the sky directly above the portal in the other dimension.
+  2. Debug testing flags can be controlled via below hotkeys or hard-set in the source code's GameCommon.hpp/cpp.
+  3. To access other dimensions, find a purple portal block hiding inside a village's tall tower.
+    The easiest way to reach it is to jump while holding shift to use the boosted jump.
+    The portal in one dimension will currently drop the player from the sky directly above the portal in the other dimension.
 	
 //-----------------------------------------------------------------------------
 How to Use: Keyboard
